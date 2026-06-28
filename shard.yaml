@@ -1,0 +1,19 @@
+shard-spec: 0.2.0
+version: 0.1.0
+name: Maps
+shorthand: maps
+description: Editable semantic notes organized into navigable maps
+dependencies:
+  - source: NUU-Cognition/shard-flint
+types:
+  - Map
+  - Note
+folders:
+  - Mesh/Maps
+install:
+  - source: otmp-map-note.md
+    dest: Shards/(Shards) Obsidian Templates/otmp-map-note.md
+    mode: once
+  - source: inst-map-plugin_commands.js
+    dest: Shards/(Shards) Plugin Commands/map.js
+    mode: force
