@@ -1,19 +1,16 @@
 shard-spec: 0.2.0
-version: 0.1.0
-name: Maps
-shorthand: maps
-description: Editable semantic notes organized into navigable maps
-dependencies:
-  - source: NUU-Cognition/shard-flint
+version: 0.0.1
+name: Invironments
+shorthand: ie
+description: The mesh's Information Environment layer — mesh sections, mesh groups, and section headers, as a neutral base for other shards
 types:
-  - Map
+  - Section
+  - Group
   - Note
-folders:
-  - Mesh/Maps
 install:
-  - source: otmp-map-note.md
-    dest: Shards/(Shards) Obsidian Templates/otmp-map-note.md
+  - source: otmp-ie-note.md
+    dest: Shards/(Shards) Obsidian Templates/otmp-ie-note.md
     mode: once
-  - source: inst-map-plugin_commands.js
-    dest: Shards/(Shards) Plugin Commands/map.js
+  - source: inst-ie-plugin_commands.js
+    dest: Shards/(Shards) Plugin Commands/ie.js
     mode: force

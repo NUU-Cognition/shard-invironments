@@ -1,39 +1,51 @@
-# Map
+# Invironments
 
-The Flint's **semantic content layer** — editable notes organized into navigable maps. Where work artifacts (Tasks, Plans, Increments) track *what is being done*, Map tracks *what is known*.
+The mesh's **Information Environment (IE)** layer — the core primitives for structuring a flat mesh: **mesh sections** (where a node lives), **mesh groups** (what it's part of), and **section headers** (declared context, when earned). A neutral base holding raw understanding + manipulation only; workspace conventions (`Mesh/Main/`, `Mesh/Sections/`, `Mesh/Groups/`, the staging sections) belong to the Flint shard, which depends on this one.
 
-## Model
+## The Grammar
 
-- **Map** — a named collection of notes, realized as a folder `Mesh/Maps/(Map) <Name>/` with a root **index** file.
-- **Note** — the atomic unit: one editable model, a slice of reality. Flat `#note`, no subtypes, bound to one map.
-- **Index** — the map's root file: its Information Environment + a navigation guide. Never a note list.
-- **`load`** — assembles the note list on demand from each note's `description`, so there is one source of truth and nothing to keep in sync.
-- **`contact`** — optional grounding: where a note's slice touches reality (`cb-<codebase>` today; telemetry, datasets, people later).
+| Tag | Meaning |
+|-----|---------|
+| `#ie/sections/<name>` | Lives in mesh section `<name>` — exactly one per node; names flat + unique |
+| `#ie/groups/<name>` | In mesh group `<name>` — any number, overlap free |
+| `#ie` | Marks a `(Section)` header artifact |
+
+- **Flat mesh** — folders are display only; all structure is tags. Section identity is the name; folder nesting under `Mesh/Sections/` is arbitrary display depth.
+- **Sections are unmanaged by default** — they exist the moment a tag references them. A `(Section) <Name>.md` header (context envelope + navigation) upgrades one to managed.
+- **Main sections** — every Flint has `Mesh/Main/`: New → Working → Consolidated. Notes dumped with no destination land in New.
+- **Groups** — `(Group) <Name>.md` definitions in `Mesh/Groups/`; the sum total of a tag, named.
+- **`load`** — assembles a section's member list live from each member's `description`; headers never list members.
 
 ## Scripts
 
 ```
-flint shard map create "<Name>"          # scaffold a map + index
-flint shard map note   "<Map>" "<Title>" # scaffold a note in a map
-flint shard map list                     # list maps with note counts
-flint shard map load   "<Map>"           # print the index + assembled note scent-list
+flint shard ie section "<Name>" [display/path]  # scaffold a (Section) folder + header
+flint shard ie note ["<Section>"] "<Title>"     # scaffold a note; no section → New
+flint shard ie group "<Name>"                   # scaffold a (Group) definition
+flint shard ie list                              # sections + groups with member counts, from tags
+flint shard ie load "<Section>"                  # header + assembled member scent-list
 ```
 
 ## Structure
 
 ```
-Shards/(Dev Local) Map/
-  shard.yaml                      # Manifest — declares types Map, Note; folder Mesh/Maps
-  dev-init-maps.md                 # Init — core model + rules
+Shards/(Dev Remote) Invironments/
+  shard.yaml                      # Manifest — types Section, Group, Note (folders are Flint's)
+  dev-init-ie.md                  # Init — grammar + rules
   knowledge/
-    dev-knw-maps-model.md          # Deep reference: the Map model
+    dev-knw-ie-model.md           # Deep reference: the IE model
+  skills/
+    dev-sk-ie-create_section.md   # Create a section + author its header
   templates/
-    dev-tmp-maps-map-v0.1.md       # Map index template
-    dev-tmp-maps-note-v0.1.md      # Note template
+    dev-tmp-ie-section-v0.1.md    # Section header template
+    dev-tmp-ie-note-v0.1.md       # Note template
+    dev-tmp-ie-group-v0.1.md      # Group definition template
   workflows/
-    dev-wkfl-maps-refresh.md       # Refresh a map's index prose as notes accumulate
+    dev-wkfl-ie-refresh.md        # Refresh a header's prose as members accumulate
   scripts/
-    dev-create.js  dev-note.js  dev-list.js  dev-load.js
+    dev-section.js  dev-note.js  dev-group.js  dev-list.js  dev-load.js
   install/
-    type-maps-map.md  type-maps-note.md   # Type definitions (driven by types:)
+    type-ie-section.md  type-ie-group.md  type-ie-note.md   # Type definitions (driven by types:)
+    otmp-ie-note.md                  # Templater note template
+    inst-ie-plugin_commands.js       # Obsidian plugin command
 ```

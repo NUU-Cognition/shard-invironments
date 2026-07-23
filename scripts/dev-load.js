@@ -1,60 +1,88 @@
 #!/usr/bin/env node
-// Load a map into context: print its index, then the note scent-list assembled
-// from each note's `description` frontmatter (single source of truth).
-// Invocation: flint shard map load "<Map>"
-// Outputs: the index body, then a generated "## Notes" section.
+// Load a mesh section into context: print its header (if managed), then the
+// member scent-list assembled from frontmatter across the whole mesh (flat
+// mesh — membership is the #ie/sections/<name> tag, never the folder).
+// Invocation: flint shard ie load "<Section>"
+// Outputs: the header body (when one exists), then a generated "## Members" section.
 
 const fs = require('fs');
 const path = require('path');
 
 const flintRoot = process.env.FLINT_ROOT || process.cwd();
+const meshDir = path.join(flintRoot, 'Mesh');
 
 function cleanName(raw) {
-  return String(raw).replace(/^\(Map\)\s*/, '').trim();
+  return String(raw).replace(/^\(Section\)\s*/, '').trim();
 }
 
-// Read a single scalar frontmatter field (first occurrence).
-function frontmatterField(content, field) {
-  const fm = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!fm) return '';
-  const line = fm[1].split('\n').find((l) => l.startsWith(`${field}:`));
+function slugify(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function* walkMarkdown(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) yield* walkMarkdown(full);
+    else if (entry.name.endsWith('.md')) yield full;
+  }
+}
+
+function frontmatter(content) {
+  const m = content.match(/^---\n([\s\S]*?)\n---/);
+  return m ? m[1] : '';
+}
+
+function scalarField(fm, field) {
+  const line = fm.split('\n').find((l) => l.startsWith(`${field}:`));
   if (!line) return '';
-  return line.slice(field.length + 1).trim();
+  return line.slice(field.length + 1).trim().replace(/^["']|["']$/g, '');
 }
 
 function main() {
   const raw = process.argv[2];
   if (!raw || !raw.trim()) {
-    process.stderr.write('usage: flint shard map load "<Map>"\n');
+    process.stderr.write('usage: flint shard ie load "<Section>"\n');
     process.exit(1);
   }
   const name = cleanName(raw);
-  const folder = path.join(flintRoot, 'Mesh', 'Maps', `(Map) ${name}`);
-  const indexFile = `(Map) ${name}.md`;
-  const indexPath = path.join(folder, indexFile);
+  const slug = slugify(name);
+  const slugTag = new RegExp(`#ie/sections/${slug}(?![a-z0-9-])`);
 
-  if (!fs.existsSync(indexPath)) {
-    process.stderr.write(`no such map: ${name}\n`);
+  // Single scan: find the header (if any) and collect members.
+  let headerFile = null;
+  const members = []; // { title, desc }
+  for (const file of walkMarkdown(meshDir)) {
+    const content = fs.readFileSync(file, 'utf8');
+    const fm = frontmatter(content);
+    if (!fm || !slugTag.test(fm)) continue;
+    const base = path.basename(file);
+    if (base === `(Section) ${name}.md` || (fm.includes('"#ie"') && base.startsWith('(Section) '))) {
+      headerFile = file;
+    } else {
+      members.push({ title: base.replace(/\.md$/, ''), desc: scalarField(fm, 'description') });
+    }
+  }
+
+  if (!headerFile && members.length === 0) {
+    process.stderr.write(`no such section: ${name} (no header and no members tagged ie/sections/${slug})\n`);
     process.exit(1);
   }
 
-  // 1. Print the index verbatim (context + navigation).
-  process.stdout.write(fs.readFileSync(indexPath, 'utf8').trimEnd() + '\n');
+  if (headerFile) {
+    process.stdout.write(fs.readFileSync(headerFile, 'utf8').trimEnd() + '\n');
+  } else {
+    console.log(`# ${name}\n\n_(unmanaged section — no header; members assembled from ie/sections/${slug} tags)_`);
+  }
 
-  // 2. Assemble the note list from each note's description.
-  const notes = fs.readdirSync(folder)
-    .filter((f) => f.endsWith('.md') && f !== indexFile)
-    .sort((a, b) => a.localeCompare(b));
-
-  console.log('\n## Notes\n');
-  if (notes.length === 0) {
-    console.log('_(no notes yet)_');
+  members.sort((a, b) => a.title.localeCompare(b.title));
+  console.log('\n## Members\n');
+  if (members.length === 0) {
+    console.log('_(no members yet)_');
     return;
   }
-  for (const file of notes) {
-    const title = file.replace(/\.md$/, '');
-    const desc = frontmatterField(fs.readFileSync(path.join(folder, file), 'utf8'), 'description');
-    console.log(desc ? `- [[${title}]] — ${desc}` : `- [[${title}]]`);
+  for (const m of members) {
+    console.log(m.desc ? `- [[${m.title}]] — ${m.desc}` : `- [[${m.title}]]`);
   }
 }
 
