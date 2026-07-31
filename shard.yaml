@@ -1,5 +1,5 @@
 shard-spec: 0.2.0
-version: 0.0.1
+version: 0.1.0
 name: Invironments
 shorthand: ie
 description: The mesh's Information Environment layer — mesh sections, mesh groups, and section headers, as a neutral base for other shards
