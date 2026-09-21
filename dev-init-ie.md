@@ -58,10 +58,21 @@ modified: <date>
 | Script | Command | Output |
 |--------|---------|--------|
 | Section | `flint shard ie section "<Name>" [display/path]` | Scaffolds `(Section)` folder + header under `Mesh/Sections/` |
-| Note | `flint shard ie note ["<Section>"] "<Title>"` | Scaffolds a note; no section → New |
+| Note | `flint shard ie note "<Title>" [--section <name>] [--description <text>] [--body-file <path>] [--author <Name>] [--session <id>] [--json]` | Creates a note beside its section header. The default section is New. |
 | Group | `flint shard ie group "<Name>"` | Scaffolds a `(Group)` definition in `Mesh/Groups/` |
 | List | `flint shard ie list` | Sections and groups with member counts, from tags |
 | Load | `flint shard ie load "<Section>"` | Prints the header, then the member scent-list |
+
+The canonical note form puts the title first and uses flags for other inputs.
+Use `--title "<Title>"` to supply all inputs as flags.
+The old `note <section> "<Title>"` form still works.
+The default author is `name` in `$NUU_HOME/config.toml`, or `~/.nuucognition/config.toml` when `NUU_HOME` is not set.
+If no Name exists, the note has no `authors` field.
+The default session is `ORBH_SESSION_ID`. The note stores it as a wikilink in `orbh-sessions`.
+The title check covers all Markdown filenames under `Mesh/` and ignores letter case.
+The command never overwrites an existing file.
+`--json` returns one result object. Errors return `ok: false` and a nonzero exit code.
+Use `flint shard ie note --help` for note syntax.
 
 `load` is progressive disclosure: header first (the context), then the scent index, then open individual members as needed.
 

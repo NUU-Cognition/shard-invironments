@@ -8,7 +8,7 @@ description: "IE note — one editable slice of reality living in a single mesh 
    Flat and universal — one #note tag, no subtypes. The title IS the slice: a
    complete claim or concept that stands alone. The section TAG is authoritative —
    the folder is only the visual default. The `flint shard ie note` script
-   scaffolds this; fill in the description and body. */
+   creates this note. Use --description and --body-file to supply its content. */
 
 ```markdown
 ---
@@ -21,7 +21,8 @@ description: [One high-scent line. This is what `ie load` discloses. Required �
              a note with no description is invisible to the loader.]
 contact: /* optional; omit the field entirely if the note has no reality anchor */
   - "[[cb-[codebase]]]"
-orbh-sessions:
+orbh-sessions: /* from --session or ORBH_SESSION_ID; omit if neither exists */
+  - "[[agent-session-uuid]]"
 template: "[[tmp-ie-note-v0.1]]"
 authors: /* from flint whoami; omit if no name set */
   - "[[@Person Name]]"
