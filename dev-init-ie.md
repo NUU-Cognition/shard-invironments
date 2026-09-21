@@ -1,4 +1,5 @@
 ---
+orbh-sessions: [b0789b67-a355-4721-a49b-5763a95aa3c4]
 required-reading:
   - "[[dev-knw-ie-model]]"
 ---
@@ -66,10 +67,16 @@ modified: <date>
 The canonical note form puts the title first and uses flags for other inputs.
 Use `--title "<Title>"` to supply all inputs as flags.
 The old `note <section> "<Title>"` form still works.
-The default author is `name` in `$NUU_HOME/config.toml`, or `~/.nuucognition/config.toml` when `NUU_HOME` is not set.
+The default author is the operator Name from the CLI, passed in `FLINT_OPERATOR_NAME`.
+Without that variable, the script reads top-level `name` from `$NUU_HOME/config.toml`, or `~/.nuucognition/config.toml`.
+The fallback supports basic, literal, and multiline TOML strings.
+Use `--author` to override the default author.
 If no Name exists, the note has no `authors` field.
 The default session is `ORBH_SESSION_ID`. The note stores it as a wikilink in `orbh-sessions`.
-The title check covers all Markdown filenames under `Mesh/` and ignores letter case.
+The title check covers all Markdown filenames under `Mesh/`.
+It ignores letter case and uses Unicode NFC normalization.
+A lock for the normalized title protects the scan and creation across all sections.
+The command waits up to 10 seconds for a lock. It removes locks older than 60 seconds.
 The command never overwrites an existing file.
 `--json` returns one result object. Errors return `ok: false` and a nonzero exit code.
 Use `flint shard ie note --help` for note syntax.
