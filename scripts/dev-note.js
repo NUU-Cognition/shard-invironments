@@ -155,17 +155,19 @@ function operatorName() {
   }
 }
 
-function normalizeTitle(title) {
-  return title.normalize('NFC').toLowerCase().normalize('NFC');
+// One key for the lock and the duplicate check. Use the complete filename:
+// lower case depends on context (Greek final sigma), so "ΟΣ" and "ΟΣ.md" differ.
+function titleKey(filename) {
+  return filename.normalize('NFC').toLowerCase().normalize('NFC');
 }
 
-function existingNote(files, filename) {
-  const existing = files.find((file) => normalizeTitle(path.basename(file)) === normalizeTitle(filename));
+function existingNote(files, key) {
+  const existing = files.find((file) => titleKey(path.basename(file)) === key);
   if (existing) fail('NOTE_EXISTS', `Note already exists: ${path.relative(flintRoot, existing)}`);
 }
 
-async function lockTitle(title, filename) {
-  const hash = crypto.createHash('sha256').update(normalizeTitle(title)).digest('hex').slice(0, 32);
+async function lockTitle(key) {
+  const hash = crypto.createHash('sha256').update(key).digest('hex').slice(0, 32);
   const lock = path.join(flintRoot, '.flint', 'locks', `note-${hash}`);
   fs.mkdirSync(path.dirname(lock), { recursive: true });
   const deadline = Date.now() + 10000;
@@ -203,7 +205,7 @@ async function lockTitle(title, filename) {
       throw error;
     }
     if (Date.now() >= deadline) {
-      existingNote([...walkMarkdown(meshDir)], filename);
+      existingNote([...walkMarkdown(meshDir)], key);
       fail('NOTE_CREATE_FAILED', 'Another process is creating this note. Run the command again.');
     }
     await delay(25);
@@ -258,7 +260,8 @@ async function main() {
   // Keep the old filename rule. Lock the same title in every Mesh section.
   const safeTitle = title.replace(/[/\\]/g, '-');
   const filename = `${safeTitle}.md`;
-  const lock = await lockTitle(safeTitle, filename);
+  const key = titleKey(filename);
+  const lock = await lockTitle(key);
   let result;
   try {
     const files = [...walkMarkdown(meshDir)];
@@ -267,7 +270,7 @@ async function main() {
       fail('SECTION_NOT_FOUND', `No such section: ${sectionArg}.`,
         [`flint shard ie section ${quote(cleanName(sectionArg))}`]);
     }
-    existingNote(files, filename);
+    existingNote(files, key);
 
     let body = '';
     if (values['body-file'] !== undefined) {
