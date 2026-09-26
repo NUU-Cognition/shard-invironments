@@ -1,9 +1,9 @@
 shard-spec: "0.3.0"
 id: 334b1e97-d573-410a-bf72-9691fc33da07
-org: nuu-cognition
+org: nuucognition
 source:
   id: cd9414ba-9860-411a-8670-6561df2b5e3e
-version: 0.1.0
+version: 0.1.1
 name: Invironments
 shorthand: ie
 description: The mesh's Information Environment layer — mesh sections, mesh groups, and section headers, as a neutral base for other shards
