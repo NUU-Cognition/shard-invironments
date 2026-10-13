@@ -1,12 +1,12 @@
 ---
-orbh-sessions: [b0789b67-a355-4721-a49b-5763a95aa3c4]
+orbh-sessions: [b0789b67-a355-4721-a49b-5763a95aa3c4, b37f454a-9107-4acd-8b19-7da95177ddfe]
 required-reading:
   - "[[dev-knw-ie-model]]"
 ---
 
 # Invironments
 
-The mesh's **Information Environment (IE)** layer — the core primitives for structuring a flat mesh. This shard is a **neutral base**: it holds the raw understanding (the grammar, the model) and the manipulation tooling (scripts, templates), and deliberately nothing else. Workspace conventions — the `Mesh/Main/`, `Mesh/Sections/`, `Mesh/Groups/` folders and the staging sections — belong to the **Flint shard, which depends on this one**. Other shards — OrbCode, Specifications, Current — build their environments on the same primitives.
+The mesh's **Information Environment (IE)** layer: the core primitives that give a mesh its structure. The mesh is flat, with one exception: a section folder has meaning. This shard is a **neutral base**. It holds the grammar, the model, and the tools (scripts, templates), and nothing else. The workspace conventions (the `Mesh/Main/`, `Mesh/Sections/`, and `Mesh/Groups/` folders and the staging sections) belong to the **Flint shard, which depends on this one**. Other shards (OrbCode, Specifications, Current) build their environments on the same primitives.
 
 ## The Grammar
 
@@ -14,80 +14,90 @@ One tag namespace. Two primitives. One marker.
 
 | Tag | Meaning |
 |-----|---------|
-| `#ie/sections/<name>` | This node lives in **mesh section** `<name>`. Exactly one per node. |
-| `#ie/groups/<name>` | This node belongs to **mesh group** `<name>`. Any number; overlap is free. |
-| `#ie` | This node is a **section header** — the `(Section)` artifact carrying context + navigation. |
+| `#ie/sections/<key>` | This document is in the **mesh section** with the key `<key>`. Zero or one per document. |
+| `#ie/groups/<key>` | This document is in the **mesh group** `<key>`. Any number per document. |
+| `#ie` | This document is a **section header**: the `(Section) <Name>` document of a section folder. |
 
-That is the entire grammar. *Section* = where you are (one place). *Group* = what you're part of (many). Nothing else exists at this layer.
+A *section* is where a document is (one place, or none). A *group* is what a document is part of (any number). The full rules are in [[(Spec) Mesh Section and Group Model]].
 
 ## Mesh Sections
 
-The core primitive: an exclusive container — basically an **unmanaged environment**. A section exists the moment a tag references it; nothing needs creating. Rules:
+A section is a named set of documents with a semantic boundary. A section is three things that agree:
 
-- **Names are flat and unique.** `#ie/sections/orbcode` means the same thing everywhere. There is no hierarchy in the data model.
-- **Folders are display only.** Sections live visually under `Mesh/Sections/` at arbitrary depth — nest folders however reads well. Moving a section's folder changes nothing.
-- **Headers are optional.** Dropping a `(Section) <Name>.md` header into a section upgrades it to a *managed* environment: the header carries the context envelope (what a mind must hold to read the members) and a navigation guide. Headers are earned, not required.
+- **The section folder** `(Section) <Name>/`, anywhere under the mesh folder, but never inside another section folder. The folder has meaning: the members of the section are in this folder or in its subfolders.
+- **The section header** `(Section) <Name>.md`, directly in the section folder. It has the tag `#ie` and the section tag. It holds the context envelope (what a mind must hold to read the members), a navigation guide, and a one-line `description`. Every section has a header.
+- **The section tag** `#ie/sections/<key>` on each member, the header included. The tag is the membership. A tag alone does not make a section: the folder and the header make it.
+
+A document has zero or one section. A document with no section tag is **unsectioned**.
+
+**Name and key.** A section name has words of letters and digits. Each word starts with a capital letter or a digit. One space separates two words. A name has 1 to 64 characters and no hyphen or other punctuation (`Mesh SDK Docs` is valid). The key is the name in lowercase, with `-` between the words (`Mesh SDK Docs` → `mesh-sdk-docs`). Keys are flat and unique in the mesh. Tools compare sections by key, and accept the name, the key, or the header title.
+
+**Kind.** The header can have `section-kind: open` or `section-kind: closed`. No value means `open`. In a **closed** section, every counted link from a member goes to a member of the same section. An **open** section can link out. Links into a section are always allowed. The counted links and the exceptions are in [[(Spec) Mesh Section and Group Model . Sections]] § 5.
+
+`mesh check` reports each break of these rules, and the `mesh section` commands (`create`, `rename`, `move`, `unassign`, `kind`, `merge`, `delete`, `fix`) keep the folder, the header, and the tags in agreement.
 
 ## The Main Sections (Flint's convention)
 
-The **Flint shard** scaffolds three always-there sections under `Mesh/Main/`:
+The **Flint shard** scaffolds three sections under `Mesh/Main/`:
 
 ```
 New → Working → Consolidated
 ```
 
-When a note is dumped with no destination, it goes to **New**. Processing moves it forward or into the section where it belongs. This staging convention is Flint's declaration, not this shard's — the mechanism here is neutral to it (the `note` script merely defaults to the New section when one exists).
+When a note has no destination, it goes to **New**. Processing moves it forward, or into the section where it belongs. This staging convention belongs to the Flint shard, not to this shard. The mechanism here is neutral to it: the `note` script uses the New section only as its default.
 
 ## Mesh Groups
 
-A group is the sum total of a tag, named: an overlapping collection that cuts across sections. Each group has a definition file `(Group) <Name>.md` in `Mesh/Groups/` — name, one-line description, optional prose. Use a group for anything meant to be *findable as a collection*; use a section for where something *lives*.
+A group is a named set of documents that cuts across sections. The group tag `#ie/groups/<key>` is the only authority for membership. A document can be in any number of groups, from any section or from no section. The place of a file has no meaning for a group.
+
+The group definition `(Group) <Name>.md` is **optional**. It names the group and gives a one-line description. It has its own group tag. It can be in any folder; `mesh group create` writes it in `[groups] folder` (default `Groups` under the mesh folder). A group key uses the section key grammar, and a definition name uses the section name grammar.
+
+Use a group for a collection that people find and use as a collection. Use a section for the place where a document is.
 
 ## The Note Contract
 
-The atomic member — one editable model, a slice of reality (see [[knw-f-models]]):
+The atomic member: one editable model, a slice of reality (see [[knw-f-models]]):
 
 ```yaml
-tags: ["#note", "#ie/sections/<name>"]  # the section tag is authoritative
-description: <one-line scent>           # required — what load discloses
+tags: ["#note", "#ie/sections/<key>"]   # the section tag is optional: zero or one
+description: <one-line scent>           # required: load shows it
 contact: []                             # optional; reality anchors
 created: <date>
 modified: <date>
 ```
 
+A note with a section tag is in the folder of that section.
+
 ## Scripts
 
-| Script | Command | Output |
-|--------|---------|--------|
-| Section | `flint shard ie section "<Name>" [display/path]` | Scaffolds `(Section)` folder + header under `Mesh/Sections/` |
-| Note | `flint shard ie note "<Title>" [--section <name>] [--description <text>] [--body-file <path>] [--author <Name>] [--session <id>] [--json]` | Creates a note beside its section header. The default section is New. |
-| Group | `flint shard ie group "<Name>"` | Scaffolds a `(Group)` definition in `Mesh/Groups/` |
-| List | `flint shard ie list` | Sections and groups with member counts, from tags |
-| Load | `flint shard ie load "<Section>"` | Prints the header, then the member scent-list |
+Each script calls the `mesh` CLI. The script uses `MESH_BIN` when it is set (a path to the `mesh` binary, or to its `bin.js`), else `mesh` on the `PATH`. The mesh root is the Flint root (the folder of `mesh.json`).
 
-The canonical note form puts the title first and uses flags for other inputs.
-Use `--title "<Title>"` to supply all inputs as flags.
-The old `note <section> "<Title>"` form still works.
-The default author is the operator Name from the CLI, passed in `FLINT_OPERATOR_NAME`.
+| Script | Command | What it does |
+|--------|---------|--------------|
+| Section | `flint shard ie section "<Name>" [--in <folder>] [--kind open\|closed] [--description <text>] [--json]` | Creates the section folder and its header in one transaction (`mesh section create`, then the header fields and body of [[dev-tmp-ie-section-v0.2]]). The parent folder is `--in`, else `[sections] folder`. |
+| Note | `flint shard ie note "<Title>" [--section <section>] [--description <text>] [--body-file <path>] [--author <Name>] [--session <id>] [--json]` | Creates a note in the folder of its section, with the section tag (`mesh create --section`). The default section is New. |
+| Group | `flint shard ie group "<Name>" [--description <text>] [--json]` | Creates a group definition (`mesh group create`, then the fields of [[dev-tmp-ie-group-v0.2]]). |
+| List | `flint shard ie list [--json]` | Lists the sections and the groups with their counts (`mesh section list`, `mesh group list`). |
+| Load | `flint shard ie load "<Section>" [--json]` | Prints the header, then the member scent list (`mesh section show`). |
+
+A `<section>` argument is the section name, the key, or the header title.
+The default author of a note is the operator Name from the CLI, passed in `FLINT_OPERATOR_NAME`.
 Without that variable, the script reads top-level `name` from `$NUU_HOME/config.toml`, or `~/.nuucognition/config.toml`.
-The fallback supports basic, literal, and multiline TOML strings.
-Use `--author` to override the default author.
-If no Name exists, the note has no `authors` field.
+Use `--author` to override the default author. If no Name exists, the note has no `authors` field.
 The default session is `ORBH_SESSION_ID`. The note stores it as a wikilink in `orbh-sessions`.
-The title check covers all Markdown filenames under `Mesh/`.
-It ignores letter case and uses Unicode NFC normalization.
-A lock for the normalized title protects the scan and creation across all sections.
-The command waits up to 10 seconds for a lock. It removes locks older than 60 seconds.
-The command never overwrites an existing file.
+The `mesh` CLI refuses a title or case collision anywhere in the mesh (exit 9) and never overwrites a file.
 `--json` returns one result object. Errors return `ok: false` and a nonzero exit code.
-Use `flint shard ie note --help` for note syntax.
+Use `flint shard ie note --help` for the note syntax.
 
-`load` is progressive disclosure: header first (the context), then the scent index, then open individual members as needed.
+`load` is progressive disclosure: the header first (the context), then the scent index, then the members that the task needs.
 
 ## Rules
 
-1. Membership is the `#ie/sections/<name>` tag — one per node. The folder a file sits in means nothing semantically.
-2. Section names are flat and unique across the mesh.
-3. Headers never list members — `load` assembles the list from each member's `description`.
-4. Every note carries a one-line `description`.
-5. Keep this layer neutral: shards that build environments declare sections and author headers; they don't extend the grammar.
-6. Use the scripts to scaffold; author the prose (header framing, note bodies, descriptions) yourself.
+1. Membership is the section tag `#ie/sections/<key>`: zero or one per document. A member is in its section folder (or a subfolder of it).
+2. Section keys are flat and unique in the mesh. Section names follow the name grammar, and the key is the fold of the name. A section folder is never inside another section folder.
+3. Every section has its header. Headers never list members: `load` assembles the list from the `description` of each member.
+4. Every note has a one-line `description`.
+5. A closed section has no crossing links. `mesh check` reports `SECTION_NOT_CLOSED`.
+6. The group tag is the only authority for group membership. A group definition is optional.
+7. Keep this layer neutral: shards that build environments declare sections and write headers. They do not extend the grammar.
+8. Use the scripts or the `mesh` commands to create and change sections and groups. Write the prose (header framing, note bodies, descriptions) yourself.

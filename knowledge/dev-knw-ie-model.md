@@ -1,5 +1,5 @@
 ---
-description: "The IE model — mesh sections, mesh groups, headers, the tag grammar, main sections, and progressive disclosure via load"
+description: "The IE model — mesh sections (folder, header, tag, kind, closure), mesh groups, the tag grammar, main sections, and progressive disclosure via load"
 ---
 
 # Knowledge: The IE Model
@@ -10,48 +10,65 @@ Deep reference for the Invironments shard. This is the mesh's structural base la
 
 A model only means something inside an **Information Environment** — the context a mind must hold to interpret it (see [[knw-f-models]] § Information Environments). A bare Flint has exactly one implicit environment: the whole mesh. Real work grows pockets of local meaning — a codebase's concept layer, a spec, an idea being developed — each needing a place to live and, when it matures, its own declared context.
 
-This shard supplies the smallest possible mechanism for that: **sections** (where things live), **groups** (what things are part of), and **headers** (declared context, when earned) — the raw understanding and the manipulation tooling, nothing more. It is deliberately neutral: a base other shards build on, not an opinionated system of its own. The workspace conventions built on it (folders, staging sections) belong to the Flint shard, which depends on this one.
+This shard supplies the smallest mechanism for that: **sections** (where things are), **groups** (what things are part of), and **headers** (the declared context of a section). It holds the grammar and the tools, and nothing more. It is neutral: a base that other shards build on, not a system with its own opinions. The workspace conventions on top of it (folders, staging sections) belong to the Flint shard, which depends on this one. The normative rules are in [[(Spec) Mesh Section and Group Model]].
 
-## The Mesh Is Flat
+## The Mesh Is Flat, Except Section Folders
 
-There are no folders in the mesh, semantically. Folders are a **display concern** — visual arrangement for humans browsing in Obsidian. Nothing may ever depend on where a file sits on disk. All structure lives in frontmatter tags:
+The mesh is flat: a document is identified by its title, and titles are unique in the mesh. Folders are display only, with one exception: a **section folder** `(Section) <Name>/` has meaning. A document in a section folder (or in a subfolder of it) is placed in that section. Structure lives in frontmatter tags and in section folders:
 
 | Structure | Carried by |
 |-----------|-----------|
-| Where a node lives | `#ie/sections/<name>` — exactly one |
-| What collections it's part of | `#ie/groups/<name>` — any number |
-| Which file is a section's header | bare `#ie` on a `(Section)` artifact |
+| The section of a document | the section tag `#ie/sections/<key>` (zero or one), and the file is in the section folder |
+| The groups of a document | `#ie/groups/<key>` (any number); the place of the file has no meaning |
+| The header of a section | the document `(Section) <Name>.md` directly in its section folder, with the bare `#ie` tag |
 
-Scripts and agents assemble every view by scanning frontmatter, never by walking directories.
+The tag and the folder must agree. `mesh check` reports each disagreement (`SECTION_FOLDER_MISMATCH`), and `mesh section fix` repairs it.
 
 ## Mesh Sections
 
-The core primitive: an exclusive container — an **unmanaged environment** by default.
+A section is the semantic boundary of the mesh: a named set of documents. A section is three things that agree:
 
-- **Existence is free.** A section exists the moment a tag references it. No registration, no file required.
-- **Names are flat and unique.** Section identity is the name alone — `#ie/sections/orbcode` is the same section regardless of any folder arrangement. There is no parent relation in the data model; "nesting" is purely how folders are displayed.
-- **Exclusive membership.** A node carries exactly one section tag. Where something lives is a single fact.
-- **Display convention.** Sections sit visually under `Mesh/Sections/`, as `(Section) <Name>/` folders, nested to any depth that reads well. The three main sections sit under `Mesh/Main/`. Moving folders around changes nothing.
+- **The section folder** `(Section) <Name>/`. It can be at any depth under the mesh folder, but never inside another section folder (`SECTION_FOLDER_NESTED`). Its subfolders are display only. The read-only scope and the media folder hold no sections.
+- **The section header** `(Section) <Name>.md`, directly in the section folder (`SECTION_HEADER_MISSING`, `SECTION_HEADER_INVALID`).
+- **The section tag** `#ie/sections/<key>` on each member. The header is a member too.
 
-### Headers — Managed Sections
+A section exists when its folder and its header exist. A section tag alone does not make a section (`SECTION_UNKNOWN`).
 
-A `(Section) <Name>.md` artifact upgrades a section from unmanaged to **managed**. The header carries:
+- **Zero or one section per document.** Two section tags is `MULTIPLE_SECTIONS`. A document with no section tag is unsectioned.
+- **Name and key.** A name has words of letters and digits. Each word starts with a capital letter or a digit. One space separates two words. A name has 1 to 64 characters and no hyphen or other punctuation. The key is the fold of the name: each word in lowercase, joined by `-` (`Guest Mesh Draft` → `guest-mesh-draft`, `Q4 Review` → `q4-review`). A key matches `^[a-z0-9]+(-[a-z0-9]+)*$` (`SECTION_NAME_INVALID`). Keys are flat and unique in the mesh (`SECTION_DUPLICATE`). Tools compare sections by key.
+- **Archive.** An archived member stays in its section, in the subfolder `Archive/` of the section folder.
 
-1. **Context envelope** — what a mind must already hold to interpret this section's members: the lens, the scope, local definitions, assumed background.
-2. **Navigation guide** — the higher-level shape: how the section is organized, where to start, the throughlines.
+### Section Kind and Closure
+
+The header can have `section-kind: open` or `section-kind: closed`. No value means `open`.
+
+- In a **closed** section, every counted link from a member goes to a member of the same section. A counted link to another document is a **crossing link**, and `mesh check` reports `SECTION_NOT_CLOSED` with every crossing link.
+- An **open** section can have crossing links. Links into a section are always allowed.
+- **Counted links:** body links and embeds, and frontmatter links except the keys `authors`, `template`, `orbh-sessions`, and `[sections] closure-exempt-keys` of `mesh.toml`.
+- **Not counted:** a link that does not resolve or is ambiguous, a link into the read-only scope, a link to a type definition in `[types] folder`, a link or embed to media, a braced cross-mesh reference, and a link from a document to itself. A heading or block anchor counts as a link to its document.
+
+The full rule is in [[(Spec) Mesh Section and Group Model . Sections]] § 5. `mesh section crossings <section>` lists the crossing links, and `mesh section kind <section> closed` refuses while crossing links exist.
+
+### Headers
+
+The header `(Section) <Name>.md` carries:
+
+1. **Context envelope**: what a mind must already hold to read the members of the section (the lens, the scope, local definitions, assumed background).
+2. **Navigation guide**: the higher-level shape: how the section is organized, where to start, the throughlines.
 
 Header frontmatter:
 
 ```yaml
 tags:
-  - "#ie"                       # marks this artifact as a header
-  - "#ie/sections/<name>"       # the section it heads (and lives in)
+  - "#ie"                       # marks this document as a header
+  - "#ie/sections/<key>"        # the section it heads (the header is a member)
+section-kind: open              # optional: open (default) or closed
 description: <one-line scent>   # how the section reads in listings
 ```
 
-The header never lists members — each member owns its `description`, and `load` assembles the list live. Editing a member's description updates what `load` shows instantly; staleness of the list is structurally impossible. What *can* age is the header's curated prose — that is a judgment task, handled by [[dev-wkfl-ie-refresh]].
+The header never lists members. Each member owns its `description`, and `load` assembles the list live. So the list is never out of date. The curated prose of the header can age; [[dev-wkfl-ie-refresh]] handles that.
 
-Headers are **earned**: most sections start as bare tags and get a header when the framing pays for itself. This is progressive typing applied to the environment layer.
+Every section has a header. `mesh section create` writes the folder and the header in one transaction; the `section` script then adds the skeleton of [[dev-tmp-ie-section-v0.2]].
 
 ## The Main Sections (Flint's convention)
 
@@ -67,16 +84,18 @@ Processing is the pass that moves nodes out of New: forward through the stages, 
 
 ## Mesh Groups
 
-A **group** is the sum total of a tag, named — an overlapping collection that cuts across sections. Where a section says *where a node lives* (one answer), groups say *what it is part of* (many answers).
+A **group** is a named set of documents that cuts across sections. A section says *where a document is* (one answer, or none). Groups say *what it is part of* (any number of answers).
 
-Each group has a definition file `(Group) <Name>.md` in `Mesh/Groups/`:
+- **The tag is the only authority.** A document is in group G when its frontmatter tags have `#ie/groups/<key>`. A document can be in any number of groups, from any section or from no section. The place of the file has no meaning for a group.
+- **The definition is optional.** A definition `(Group) <Name>.md` names the group and gives a one-line description. It has its own group tag, so it is a member of its group. It can be in any folder; `mesh group create` writes it in `[groups] folder` (default `Groups` under the mesh folder). A valid definition declares its group, also when no document has the tag yet.
+- **Grammar.** A group key uses the section key grammar (`GROUP_NAME_INVALID`, a warning). A definition name uses the section name grammar and folds to the key. Two definitions that fold to one key are `GROUP_DUPLICATE`.
 
 ```yaml
-tags: ["#ie/groups/<name>"]     # the group tags itself — its file is findable with its members
+tags: ["#ie/groups/<key>"]      # the definition has its own group tag
 description: <one-line scent>
 ```
 
-Groups replace free-floating ad-hoc tags for any collection meant to be *found and used as a collection*. If a grouping matters enough to reference, it matters enough to have a definition file.
+Use a group for a collection that people find and use as a collection. The `mesh group` commands (`list`, `show`, `create`, `add`, `remove`, `rename`, `delete`) change groups, and the selection flags `--group` (all) and `--any-group` (one of them) select by group.
 
 ## The Note Contract
 
@@ -87,7 +106,7 @@ The atomic member — one editable model, a slice of reality. Deliberately minim
 id: <uuid>
 tags:
   - "#note"
-  - "#ie/sections/cognition"
+  - "#ie/sections/cognition"     # optional: zero or one section tag
 description: The second axiom — minds have no unmediated access to reality.
 contact: []
 created: 2026-07-23
@@ -101,12 +120,14 @@ modified: 2026-07-23
 
 | Field | Required | Purpose |
 |-------|----------|---------|
-| `tags` | yes | `#note` + exactly one section tag (+ any group tags) |
+| `tags` | yes | `#note`, zero or one section tag, and any group tags |
 | `description` | yes | One-line scent — what `load` discloses; a note without it is invisible |
 | `contact` | no | Reality anchors: where this slice touches the territory (`cb-<codebase>` today; telemetry, datasets, people later) |
 | `created` / `modified` | yes | Timestamps; `modified` is a convention, not enforced |
 
-Sections contain *any* artifact type, not just notes — a task, a spec, a report all carry section tags. The note is simply the shard's own minimal member type.
+The section tag is optional. A note with a section tag is in the folder of its section; `mesh create --section <section>` places it there. A note with no section tag is unsectioned.
+
+A section can hold *any* artifact type, not only notes: a task, a spec, or a report can have a section tag. The note is the minimal member type of this shard.
 
 ## Load — Progressive Disclosure
 
@@ -125,19 +146,18 @@ Header first (so the reader knows how to interpret what follows), then the scent
 
 ## Neutrality — How Other Shards Build on This
 
-This layer is a base, like Flint itself. A shard that creates an environment (OrbCode's concept layer, a spec's world, Current's idea pockets):
+This layer is a base, like Flint itself. A shard that creates an environment (the concept layer of OrbCode, the world of a spec, the idea pockets of Current):
 
-1. Declares a section (just starts tagging into it — flat unique name).
-2. Authors a header when framing pays.
-3. Optionally defines groups for its cross-cutting collections.
+1. Creates a section (`mesh section create`, or the `section` script): the folder, the header, and the flat unique key.
+2. Writes the prose of the header.
+3. Optionally names groups for its cross-cutting collections.
 
-It never extends the grammar, adds membership kinds, or introduces parallel structure. If a capability seems missing here, the answer is a conversation about this shard — not a workaround in another one.
+It never extends the grammar, adds membership kinds, or adds a parallel structure. If a capability seems missing here, discuss a change to this shard. Do not add a workaround in another shard.
 
 ## Later (Deliberately Deferred)
 
-Recorded so they aren't relitigated, deferred so the base stays simple:
+These items are recorded so that nobody discusses them again, and deferred so that the base stays simple:
 
-- **Contamination / boundary theory** — reference direction between environments, definition shadowing, coloring vs isolation. Current's concern, layered on top when that work starts.
-- **Operations** — move, split/merge, promote/land, coherence scans.
-- **The all-shards migration** — every artifact in the mesh carrying a section tag.
-- **Media** — markdown shadow files so media can carry section tags.
+- **Contamination and definition shadowing**: definition shadowing between environments, and coloring versus isolation. Current owns this work. (The closure rule of closed sections is defined now; see Section Kind and Closure.)
+- **Cross-mesh reference form**: the rendering of a braced cross-mesh reference. Closure ignores such references until then.
+- **Media**: Markdown shadow files, so that media can have section tags. Media travels with a section by embed closure.

@@ -1,76 +1,111 @@
 #!/usr/bin/env node
-// List every mesh section and mesh group with member counts — assembled
-// entirely from frontmatter tags (flat mesh; folders are display only).
-// Invocation: flint shard ie list
-// Outputs: sections (headed and unmanaged), then groups.
+// List every mesh section and mesh group with counts, from the mesh CLI
+// (`mesh section list`, `mesh group list`).
+// Invocation: flint shard ie list [--json]
+// Outputs: the sections (with the unsectioned count), then the groups.
 
 const fs = require('fs');
 const path = require('path');
 
-const flintRoot = process.env.FLINT_ROOT || process.cwd();
-const meshDir = path.join(flintRoot, 'Mesh');
+const { spawnSync } = require('child_process');
 
-function* walkMarkdown(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.')) continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) yield* walkMarkdown(full);
-    else if (entry.name.endsWith('.md')) yield full;
+const flintRoot = process.env.FLINT_ROOT || process.cwd();
+
+function fail(code, reason, next = []) {
+  throw Object.assign(new Error(reason), { scriptCode: code, next });
+}
+
+function meshCommand() {
+  const bin = (process.env.MESH_BIN || '').trim();
+  if (!bin) return ['mesh'];
+  return bin.endsWith('.js') ? [process.execPath, bin] : [bin];
+}
+
+function requireMeshRoot() {
+  if (!fs.existsSync(path.join(flintRoot, 'mesh.json'))) {
+    fail('MESH_ROOT_MISSING', `This Flint has no mesh root (no mesh.json in ${flintRoot}).`, [`mesh init ${JSON.stringify(flintRoot)}`]);
   }
 }
 
-function frontmatter(content) {
-  const m = content.match(/^---\n([\s\S]*?)\n---/);
-  return m ? m[1] : '';
+// Run one mesh command with --json. Returns the parsed output lines.
+function mesh(args, input) {
+  requireMeshRoot();
+  const [command, ...prefix] = meshCommand();
+  const run = spawnSync(command, [...prefix, ...args, '--root', flintRoot, '--json'], {
+    encoding: 'utf8',
+    input,
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (run.error) {
+    fail('MESH_CLI_MISSING', `Cannot run the mesh CLI (${command}): ${run.error.message}. Install it, or set MESH_BIN.`);
+  }
+  const lines = run.stdout.split('\n').filter((line) => line.trim().startsWith('{')).map((line) => JSON.parse(line));
+  return { status: run.status, lines, stderr: run.stderr };
 }
+
+// The result of one mesh command, or a failure with its message and next commands.
+function meshResult(args, input) {
+  const { status, lines, stderr } = mesh(args, input);
+  const envelope = lines[lines.length - 1];
+  if (status === 0 && envelope && envelope.ok) return envelope.result;
+  if (envelope && /Unknown command/i.test(envelope.message || '')) {
+    fail('MESH_CLI_OLD', `The mesh CLI has no "${args.slice(0, 2).join(' ')}" command. Install the mesh CLI with the section and group commands.`);
+  }
+  fail(envelope ? envelope.code : 'MESH_FAILED', envelope ? envelope.message : (stderr || `mesh exited ${status}`).trim(), (envelope && envelope.next) || []);
+}
+
+// The results of an atomic batch (one per request), or a failure with the message of the first failed request.
+function meshBatch(requests) {
+  const { status, lines, stderr } = mesh(['batch', '--atomic'], requests.map((request) => JSON.stringify(request)).join('\n') + '\n');
+  const envelope = lines[lines.length - 1];
+  const results = (envelope && envelope.result && envelope.result.results) || [];
+  if (status === 0 && results.length === requests.length && results.every((line) => line.ok)) return results.map((line) => line.result);
+  const failed = results.find((line) => !line.ok && line.code !== 'NOT_APPLIED' && line.code !== 'SKIPPED') || (envelope && !envelope.ok ? envelope : undefined);
+  if (failed && /unknown command/i.test(failed.message || '')) {
+    fail('MESH_CLI_OLD', 'The mesh CLI has no section or group commands. Install the mesh CLI with the section and group commands.');
+  }
+  fail(failed ? failed.code : 'MESH_FAILED', failed ? failed.message : (stderr || `mesh batch exited ${status}`).trim(), (failed && failed.next) || []);
+}
+
+// Print a failure: one JSON object with --json, else the reason and the next commands. Exit 1.
+function report(error, json, kind) {
+  const code = error.scriptCode || 'SCRIPT_FAILED';
+  if (json) {
+    console.log(JSON.stringify({ ok: false, kind, code, reason: error.message, created: [], next: error.next || [] }));
+  } else {
+    console.error(error.message);
+    for (const command of error.next || []) console.error(command);
+  }
+  process.exitCode = 1;
+}
+
+const json = process.argv.includes('--json');
 
 function main() {
-  if (!fs.existsSync(meshDir)) return;
-
-  const headers = {}; // slug -> display name
-  const groupDefs = {}; // slug -> display name
-  const sectionCounts = {}; // slug -> member count
-  const groupCounts = {}; // slug -> member count
-
-  for (const file of walkMarkdown(meshDir)) {
-    const content = fs.readFileSync(file, 'utf8');
-    const fm = frontmatter(content);
-    if (!fm) continue;
-    const base = path.basename(file, '.md');
-
-    for (const m of fm.matchAll(/#ie\/sections\/([a-z0-9-]+)/g)) {
-      sectionCounts[m[1]] = (sectionCounts[m[1]] || 0) + 1;
-      if (fm.includes('"#ie"') && base.startsWith('(Section) ')) {
-        headers[m[1]] = base.replace(/^\(Section\)\s*/, '');
-      }
-    }
-    for (const m of fm.matchAll(/#ie\/groups\/([a-z0-9-]+)/g)) {
-      groupCounts[m[1]] = (groupCounts[m[1]] || 0) + 1;
-      if (base.startsWith('(Group) ')) {
-        groupDefs[m[1]] = base.replace(/^\(Group\)\s*/, '');
-      }
-    }
+  const sections = meshResult(['section', 'list']);
+  const groups = meshResult(['group', 'list']);
+  if (json) {
+    console.log(JSON.stringify({ ok: true, kind: 'list', sections: sections.sections, unsectioned: sections.unsectioned, groups: groups.groups }));
+    return;
   }
-
-  const sectionSlugs = Object.keys(sectionCounts).sort();
-  if (sectionSlugs.length) {
-    console.log('Sections');
-    for (const slug of sectionSlugs) {
-      const label = headers[slug] ? headers[slug] : `${slug} (unmanaged)`;
-      const n = sectionCounts[slug] - (headers[slug] ? 1 : 0); // exclude the header itself
-      console.log(`  ${label} [ie/sections/${slug}] — ${n} member${n === 1 ? '' : 's'}`);
-    }
+  console.log('Sections');
+  for (const row of sections.sections) {
+    const header = row.header === null ? ' (no header)' : '';
+    const problems = row.diagnostics > 0 ? `, ${row.diagnostics} diagnostic${row.diagnostics === 1 ? '' : 's'}` : '';
+    console.log(`  ${row.name} [ie/sections/${row.key}] — ${row.kind}, ${row.members} member${row.members === 1 ? '' : 's'}, ${row.crossings} crossing link${row.crossings === 1 ? '' : 's'}${problems}${header}`);
   }
-
-  const groupSlugs = Object.keys(groupCounts).sort();
-  if (groupSlugs.length) {
+  console.log(`  (unsectioned) — ${sections.unsectioned} document${sections.unsectioned === 1 ? '' : 's'}`);
+  if (groups.groups.length > 0) {
     console.log('Groups');
-    for (const slug of groupSlugs) {
-      const label = groupDefs[slug] ? groupDefs[slug] : `${slug} (undefined)`;
-      const n = groupCounts[slug] - (groupDefs[slug] ? 1 : 0); // exclude the definition itself
-      console.log(`  ${label} [ie/groups/${slug}] — ${n} member${n === 1 ? '' : 's'}`);
+    for (const row of groups.groups) {
+      const label = row.definition !== null ? row.definition.replace(/^\(Group\)\s*/, '') : `${row.key} (no definition)`;
+      console.log(`  ${label} [ie/groups/${row.key}] — ${row.members} member${row.members === 1 ? '' : 's'}, ${row.sections} section${row.sections === 1 ? '' : 's'}, ${row.unsectioned} unsectioned`);
     }
   }
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  report(error, json, 'list');
+}

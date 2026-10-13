@@ -1,89 +1,112 @@
 #!/usr/bin/env node
-// Load a mesh section into context: print its header (if managed), then the
-// member scent-list assembled from frontmatter across the whole mesh (flat
-// mesh — membership is the #ie/sections/<name> tag, never the folder).
-// Invocation: flint shard ie load "<Section>"
-// Outputs: the header body (when one exists), then a generated "## Members" section.
+// Load a mesh section into context: print its header, then the member scent
+// list, from the mesh CLI (`mesh section show`). A <section> is the section
+// name, the key, or the header title.
+// Invocation: flint shard ie load "<Section>" [--json]
+// Outputs: the header (when one exists), then a generated "## Members" section.
 
 const fs = require('fs');
 const path = require('path');
 
+const { spawnSync } = require('child_process');
+
 const flintRoot = process.env.FLINT_ROOT || process.cwd();
-const meshDir = path.join(flintRoot, 'Mesh');
 
-function cleanName(raw) {
-  return String(raw).replace(/^\(Section\)\s*/, '').trim();
+function fail(code, reason, next = []) {
+  throw Object.assign(new Error(reason), { scriptCode: code, next });
 }
 
-function slugify(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+function meshCommand() {
+  const bin = (process.env.MESH_BIN || '').trim();
+  if (!bin) return ['mesh'];
+  return bin.endsWith('.js') ? [process.execPath, bin] : [bin];
 }
 
-function* walkMarkdown(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.')) continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) yield* walkMarkdown(full);
-    else if (entry.name.endsWith('.md')) yield full;
+function requireMeshRoot() {
+  if (!fs.existsSync(path.join(flintRoot, 'mesh.json'))) {
+    fail('MESH_ROOT_MISSING', `This Flint has no mesh root (no mesh.json in ${flintRoot}).`, [`mesh init ${JSON.stringify(flintRoot)}`]);
   }
 }
 
-function frontmatter(content) {
-  const m = content.match(/^---\n([\s\S]*?)\n---/);
-  return m ? m[1] : '';
+// Run one mesh command with --json. Returns the parsed output lines.
+function mesh(args, input) {
+  requireMeshRoot();
+  const [command, ...prefix] = meshCommand();
+  const run = spawnSync(command, [...prefix, ...args, '--root', flintRoot, '--json'], {
+    encoding: 'utf8',
+    input,
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (run.error) {
+    fail('MESH_CLI_MISSING', `Cannot run the mesh CLI (${command}): ${run.error.message}. Install it, or set MESH_BIN.`);
+  }
+  const lines = run.stdout.split('\n').filter((line) => line.trim().startsWith('{')).map((line) => JSON.parse(line));
+  return { status: run.status, lines, stderr: run.stderr };
 }
 
-function scalarField(fm, field) {
-  const line = fm.split('\n').find((l) => l.startsWith(`${field}:`));
-  if (!line) return '';
-  return line.slice(field.length + 1).trim().replace(/^["']|["']$/g, '');
+// The result of one mesh command, or a failure with its message and next commands.
+function meshResult(args, input) {
+  const { status, lines, stderr } = mesh(args, input);
+  const envelope = lines[lines.length - 1];
+  if (status === 0 && envelope && envelope.ok) return envelope.result;
+  if (envelope && /Unknown command/i.test(envelope.message || '')) {
+    fail('MESH_CLI_OLD', `The mesh CLI has no "${args.slice(0, 2).join(' ')}" command. Install the mesh CLI with the section and group commands.`);
+  }
+  fail(envelope ? envelope.code : 'MESH_FAILED', envelope ? envelope.message : (stderr || `mesh exited ${status}`).trim(), (envelope && envelope.next) || []);
 }
+
+// The results of an atomic batch (one per request), or a failure with the message of the first failed request.
+function meshBatch(requests) {
+  const { status, lines, stderr } = mesh(['batch', '--atomic'], requests.map((request) => JSON.stringify(request)).join('\n') + '\n');
+  const envelope = lines[lines.length - 1];
+  const results = (envelope && envelope.result && envelope.result.results) || [];
+  if (status === 0 && results.length === requests.length && results.every((line) => line.ok)) return results.map((line) => line.result);
+  const failed = results.find((line) => !line.ok && line.code !== 'NOT_APPLIED' && line.code !== 'SKIPPED') || (envelope && !envelope.ok ? envelope : undefined);
+  if (failed && /unknown command/i.test(failed.message || '')) {
+    fail('MESH_CLI_OLD', 'The mesh CLI has no section or group commands. Install the mesh CLI with the section and group commands.');
+  }
+  fail(failed ? failed.code : 'MESH_FAILED', failed ? failed.message : (stderr || `mesh batch exited ${status}`).trim(), (failed && failed.next) || []);
+}
+
+// Print a failure: one JSON object with --json, else the reason and the next commands. Exit 1.
+function report(error, json, kind) {
+  const code = error.scriptCode || 'SCRIPT_FAILED';
+  if (json) {
+    console.log(JSON.stringify({ ok: false, kind, code, reason: error.message, created: [], next: error.next || [] }));
+  } else {
+    console.error(error.message);
+    for (const command of error.next || []) console.error(command);
+  }
+  process.exitCode = 1;
+}
+
+const json = process.argv.includes('--json');
 
 function main() {
-  const raw = process.argv[2];
-  if (!raw || !raw.trim()) {
-    process.stderr.write('usage: flint shard ie load "<Section>"\n');
-    process.exit(1);
+  const argument = process.argv.slice(2).filter((arg) => arg !== '--json');
+  if (argument.length !== 1 || !argument[0].trim()) {
+    fail('USAGE', 'Usage: flint shard ie load "<Section>" [--json]');
   }
-  const name = cleanName(raw);
-  const slug = slugify(name);
-  const slugTag = new RegExp(`#ie/sections/${slug}(?![a-z0-9-])`);
-
-  // Single scan: find the header (if any) and collect members.
-  let headerFile = null;
-  const members = []; // { title, desc }
-  for (const file of walkMarkdown(meshDir)) {
-    const content = fs.readFileSync(file, 'utf8');
-    const fm = frontmatter(content);
-    if (!fm || !slugTag.test(fm)) continue;
-    const base = path.basename(file);
-    if (base === `(Section) ${name}.md` || (fm.includes('"#ie"') && base.startsWith('(Section) '))) {
-      headerFile = file;
-    } else {
-      members.push({ title: base.replace(/\.md$/, ''), desc: scalarField(fm, 'description') });
-    }
+  const section = meshResult(['section', 'show', argument[0].trim()]);
+  const header = section.headerPath !== null ? fs.readFileSync(path.join(flintRoot, section.headerPath), 'utf8').trimEnd() : null;
+  const members = section.members.filter((member) => member.title !== section.header);
+  if (json) {
+    console.log(JSON.stringify({ ok: true, kind: 'load', key: section.key, name: section.name, sectionKind: section.kind, header, members }));
+    return;
   }
-
-  if (!headerFile && members.length === 0) {
-    process.stderr.write(`no such section: ${name} (no header and no members tagged ie/sections/${slug})\n`);
-    process.exit(1);
-  }
-
-  if (headerFile) {
-    process.stdout.write(fs.readFileSync(headerFile, 'utf8').trimEnd() + '\n');
-  } else {
-    console.log(`# ${name}\n\n_(unmanaged section — no header; members assembled from ie/sections/${slug} tags)_`);
-  }
-
-  members.sort((a, b) => a.title.localeCompare(b.title));
+  console.log(header ?? `# ${section.name}\n\n_(no header: the folder ${section.folder} has no "(Section) ${section.name}.md")_`);
   console.log('\n## Members\n');
   if (members.length === 0) {
     console.log('_(no members yet)_');
     return;
   }
-  for (const m of members) {
-    console.log(m.desc ? `- [[${m.title}]] — ${m.desc}` : `- [[${m.title}]]`);
+  for (const member of members) {
+    console.log(member.description ? `- [[${member.title}]] — ${member.description}` : `- [[${member.title}]]`);
   }
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  report(error, json, 'load');
+}

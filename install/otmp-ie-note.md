@@ -1,29 +1,29 @@
 <%*
 /* IE note — Templater template.
-   Detects whether this file lives directly inside a `(Section) <Name>/` folder
-   and auto-populates the note frontmatter, including the authoritative section
-   tag `#ie/sections/<slug>` (the folder is only the visual default — the tag is
-   what binds the note to its section). Files created elsewhere default to the
-   New dump section. Requires the Templater community plugin.
+   Finds the nearest `(Section) <Name>/` folder above this file. In a section
+   folder (or a subfolder of it), the note gets the section tag
+   `#ie/sections/<key>` of that folder: the folder has meaning, and the tag and the folder must agree.
+   Outside a section folder, the note has no section tag (unsectioned). The key
+   is the section name in lowercase, with "-" between the words. Requires the
+   Templater community plugin.
    Tip: set this as a Templater "Folder Template" for `Mesh/Sections` and
    `Mesh/Main` so every new note is filled in automatically. */
 const folder = tp.file.folder(true);                 // e.g. "Mesh/Sections/(Section) Cognition"
-const parent = folder.split("/").pop();              // e.g. "(Section) Cognition"
-const m = parent.match(/^\(Section\)\s+(.+)$/);
-const sectionName = m ? m[1] : "New";
-const slug = sectionName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const m = folder.split("/").reverse()
+  .map((segment) => segment.match(/^\(Section\) (.+)$/)).find(Boolean); // nearest section folder
+const key = m ? m[1].split(" ").filter(Boolean).map((word) => word.toLowerCase()).join("-") : "";
+const sectionTag = key ? `\n  - "#ie/sections/${key}"` : "";
 const today = tp.date.now("YYYY-MM-DD");
 const uuid = crypto.randomUUID();
 -%>
 ---
 id: <% uuid %>
 tags:
-  - "#note"
-  - "#ie/sections/<% slug %>"
+  - "#note"<% sectionTag %>
 description: 
 contact: 
 orbh-sessions: 
-template: "[[tmp-ie-note-v0.1]]"
+template: "[[tmp-ie-note-v0.2]]"
 created: <% today %>
 modified: <% today %>
 ---

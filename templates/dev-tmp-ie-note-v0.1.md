@@ -1,54 +1,9 @@
 ---
-description: "IE note — one editable slice of reality living in a single mesh section"
+description: "Superseded by tmp-ie-note-v0.2. Do not use this version."
 ---
 
-# Filename: [beside its section's header, or in Mesh/Main/(Section) New/]/[Note Title].md
+# Superseded
 
-/* A note is the minimal member artifact: one editable model, a slice of reality.
-   Flat and universal — one #note tag, no subtypes. The title IS the slice: a
-   complete claim or concept that stands alone. The section TAG is authoritative —
-   the folder is only the visual default. The `flint shard ie note` script
-   creates this note. Use --description and --body-file to supply its content. */
+This version is superseded by [[dev-tmp-ie-note-v0.2]]. Do not create a new document from this version.
 
-```markdown
----
-id: [generate-uuid4]
-tags:
-  - "#note"
-  - "#ie/sections/[slug]" /* the mesh section this note lives in — exactly one */
-  - (continue) /* any number of "#ie/groups/[slug]" group tags */
-description: [One high-scent line. This is what `ie load` discloses. Required —
-             a note with no description is invisible to the loader.]
-contact: /* optional; omit the field entirely if the note has no reality anchor */
-  - "[[cb-[codebase]]]"
-orbh-sessions: /* from --session or ORBH_SESSION_ID; omit if neither exists */
-  - "[[agent-session-uuid]]"
-template: "[[tmp-ie-note-v0.1]]"
-authors: /* from flint whoami; omit if no name set */
-  - "[[@Person Name]]"
-created: [YYYY-MM-DD]
-modified: [YYYY-MM-DD]
----
-
-# [Note Title — a complete claim or concept that stands alone]
-
-[The model. Free-form prose, as much or as little as the slice needs. Link densely
- to other notes with [[wikilinks]]. The title carries the assertion; the body
- develops, qualifies, or grounds it.]
-
-/* Optional — include only if the note makes contact with reality: */
-# Contact
-
-[Where and how this note's slice touches the territory: which codebase module,
- which measurement, what was observed. The machine-readable anchors live in the
- `contact:` frontmatter list; this section is the prose elaboration.]
-```
-
-/* Notes:
-   - tags is always "#note" plus exactly one "#ie/sections/[slug]" section tag;
-     group tags are free.
-   - description is REQUIRED — keep it to one line.
-   - contact and the "# Contact" section are both optional and travel together;
-     omit both when the note has no reality anchor.
-   - modified: bump on substantive edits (convention, not enforced).
-*/
+The file stays so that the documents that have `template: "[[tmp-ie-note-v0.1]]"` keep a link that resolves. The rules of the section and group model (Invironments 0.2.0) are in [[dev-tmp-ie-note-v0.2]] and [[dev-knw-ie-model]].

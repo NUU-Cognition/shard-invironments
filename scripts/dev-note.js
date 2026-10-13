@@ -1,73 +1,105 @@
 #!/usr/bin/env node
-// Create a note beside its section header. The section tag defines membership.
-// Invocation: flint shard ie note "<Title>" [--section <name>] [options]
+// Create a note in the folder of its section, with the section tag, in one
+// transaction of the mesh CLI (`mesh create --section`). The default section is New.
+// Invocation: flint shard ie note "<Title>" [--section <section>] [options]
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { parseArgs } = require('util');
-const { setTimeout: delay } = require('timers/promises');
+
+const { spawnSync } = require('child_process');
 
 const flintRoot = process.env.FLINT_ROOT || process.cwd();
-const meshDir = path.join(flintRoot, 'Mesh');
+
+function fail(code, reason, next = []) {
+  throw Object.assign(new Error(reason), { scriptCode: code, next });
+}
+
+function meshCommand() {
+  const bin = (process.env.MESH_BIN || '').trim();
+  if (!bin) return ['mesh'];
+  return bin.endsWith('.js') ? [process.execPath, bin] : [bin];
+}
+
+function requireMeshRoot() {
+  if (!fs.existsSync(path.join(flintRoot, 'mesh.json'))) {
+    fail('MESH_ROOT_MISSING', `This Flint has no mesh root (no mesh.json in ${flintRoot}).`, [`mesh init ${JSON.stringify(flintRoot)}`]);
+  }
+}
+
+// Run one mesh command with --json. Returns the parsed output lines.
+function mesh(args, input) {
+  requireMeshRoot();
+  const [command, ...prefix] = meshCommand();
+  const run = spawnSync(command, [...prefix, ...args, '--root', flintRoot, '--json'], {
+    encoding: 'utf8',
+    input,
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (run.error) {
+    fail('MESH_CLI_MISSING', `Cannot run the mesh CLI (${command}): ${run.error.message}. Install it, or set MESH_BIN.`);
+  }
+  const lines = run.stdout.split('\n').filter((line) => line.trim().startsWith('{')).map((line) => JSON.parse(line));
+  return { status: run.status, lines, stderr: run.stderr };
+}
+
+// The result of one mesh command, or a failure with its message and next commands.
+function meshResult(args, input) {
+  const { status, lines, stderr } = mesh(args, input);
+  const envelope = lines[lines.length - 1];
+  if (status === 0 && envelope && envelope.ok) return envelope.result;
+  if (envelope && /Unknown command/i.test(envelope.message || '')) {
+    fail('MESH_CLI_OLD', `The mesh CLI has no "${args.slice(0, 2).join(' ')}" command. Install the mesh CLI with the section and group commands.`);
+  }
+  fail(envelope ? envelope.code : 'MESH_FAILED', envelope ? envelope.message : (stderr || `mesh exited ${status}`).trim(), (envelope && envelope.next) || []);
+}
+
+// The results of an atomic batch (one per request), or a failure with the message of the first failed request.
+function meshBatch(requests) {
+  const { status, lines, stderr } = mesh(['batch', '--atomic'], requests.map((request) => JSON.stringify(request)).join('\n') + '\n');
+  const envelope = lines[lines.length - 1];
+  const results = (envelope && envelope.result && envelope.result.results) || [];
+  if (status === 0 && results.length === requests.length && results.every((line) => line.ok)) return results.map((line) => line.result);
+  const failed = results.find((line) => !line.ok && line.code !== 'NOT_APPLIED' && line.code !== 'SKIPPED') || (envelope && !envelope.ok ? envelope : undefined);
+  if (failed && /unknown command/i.test(failed.message || '')) {
+    fail('MESH_CLI_OLD', 'The mesh CLI has no section or group commands. Install the mesh CLI with the section and group commands.');
+  }
+  fail(failed ? failed.code : 'MESH_FAILED', failed ? failed.message : (stderr || `mesh batch exited ${status}`).trim(), (failed && failed.next) || []);
+}
+
+// Print a failure: one JSON object with --json, else the reason and the next commands. Exit 1.
+function report(error, json, kind) {
+  const code = error.scriptCode || 'SCRIPT_FAILED';
+  if (json) {
+    console.log(JSON.stringify({ ok: false, kind, code, reason: error.message, created: [], next: error.next || [] }));
+  } else {
+    console.error(error.message);
+    for (const command of error.next || []) console.error(command);
+  }
+  process.exitCode = 1;
+}
+
 const args = process.argv.slice(2);
 const optionArgs = args.includes('--') ? args.slice(0, args.indexOf('--')) : args;
 const json = optionArgs.includes('--json');
-const usage = 'Usage: flint shard ie note "<Title>" [--section <name>] [--description <text>] [--body-file <path>] [--author <Name>] [--session <id>] [--json]';
+const usage = 'Usage: flint shard ie note "<Title>" [--section <section>] [--description <text>] [--body-file <path>] [--author <Name>] [--session <id>] [--json]';
 const help = `${usage}
-       flint shard ie note <section> "<Title>" [options]
        flint shard ie note --title "<Title>" [options]
 
-The default section is New. The note goes beside its section header.
+The default section is New. A <section> is the section name, the key, or the
+header title. The note goes into the folder of its section and gets the section
+tag (mesh create --section). The mesh CLI refuses a title or case collision
+anywhere in the mesh, and expands the tokens {{id}}, {{date}}, {{title}},
+{{number}}, {{author}}, and {{session}} in the content.
 The default author is FLINT_OPERATOR_NAME from the CLI.
 Without it, read name in $NUU_HOME/config.toml (or ~/.nuucognition/config.toml).
-The default session is ORBH_SESSION_ID. Use --help or -h to show this help.`;
-
-function fail(code, reason, next = []) {
-  throw Object.assign(new Error(reason), { noteCode: code, next });
-}
+The default session is ORBH_SESSION_ID. Use --help or -h to show this help.
+The mesh CLI is MESH_BIN, else mesh on the PATH.`;
 
 function usageError(reason) {
   fail('USAGE', `${reason}\n${usage}`);
-}
-
-function cleanName(raw) {
-  return String(raw).replace(/^\(Section\)\s*/, '').trim();
-}
-
-function slugify(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
-
-function* walkMarkdown(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) yield* walkMarkdown(full);
-    else if (entry.name.toLowerCase().endsWith('.md')) yield full;
-  }
-}
-
-function frontmatter(content) {
-  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  return m ? m[1] : '';
-}
-
-// Find a section header by name or slug.
-function findHeader(files, nameOrSlug) {
-  const name = cleanName(nameOrSlug);
-  const wantSlug = slugify(name);
-  for (const file of files) {
-    const base = path.basename(file);
-    if (!base.startsWith('(Section) ')) continue;
-    const fm = frontmatter(fs.readFileSync(file, 'utf8'));
-    const m = fm.match(/#ie\/sections\/([a-z0-9-]+)/);
-    if (!m) continue;
-    if (base === `(Section) ${name}.md` || m[1] === wantSlug) {
-      return { file, slug: m[1], name: cleanName(base.slice(0, -3)) };
-    }
-  }
-  return null;
 }
 
 // Read one TOML string. Other values need only lexical scanning below.
@@ -155,70 +187,13 @@ function operatorName() {
   }
 }
 
-// One key for the lock and the duplicate check. Use the complete filename:
-// lower case depends on context (Greek final sigma), so "ΟΣ" and "ΟΣ.md" differ.
-function titleKey(filename) {
-  return filename.normalize('NFC').toLowerCase().normalize('NFC');
-}
-
-function existingNote(files, key) {
-  const existing = files.find((file) => titleKey(path.basename(file)) === key);
-  if (existing) fail('NOTE_EXISTS', `Note already exists: ${path.relative(flintRoot, existing)}`);
-}
-
-async function lockTitle(key) {
-  const hash = crypto.createHash('sha256').update(key).digest('hex').slice(0, 32);
-  const lock = path.join(flintRoot, '.flint', 'locks', `note-${hash}`);
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  const deadline = Date.now() + 10000;
-  while (true) {
-    try {
-      fs.mkdirSync(lock);
-      const owned = fs.statSync(lock);
-      const isOwner = () => {
-        try {
-          const current = fs.statSync(lock);
-          return current.dev === owned.dev && current.ino === owned.ino && current.birthtimeMs === owned.birthtimeMs;
-        } catch (error) {
-          if (error.code === 'ENOENT') return false;
-          throw error;
-        }
-      };
-      return {
-        assertHeld() {
-          if (!isOwner() || Date.now() - owned.mtimeMs > 60000) {
-            fail('NOTE_CREATE_FAILED', 'The note lock expired. Run the command again.');
-          }
-        },
-        release() { if (isOwner()) fs.rmdirSync(lock); },
-      };
-    } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-    }
-    try {
-      if (Date.now() - fs.statSync(lock).mtimeMs > 60000) {
-        fs.rmdirSync(lock);
-        continue;
-      }
-    } catch (error) {
-      if (error.code === 'ENOENT') continue;
-      throw error;
-    }
-    if (Date.now() >= deadline) {
-      existingNote([...walkMarkdown(meshDir)], key);
-      fail('NOTE_CREATE_FAILED', 'Another process is creating this note. Run the command again.');
-    }
-    await delay(25);
-  }
-}
-
 // JSON strings are YAML double-quoted scalars. Escape YAML line separators too.
 function quote(value) {
   return JSON.stringify(value).replace(/[\u0085\u2028\u2029]/g,
     (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }
 
-async function main() {
+function main() {
   let parsed;
   try {
     parsed = parseArgs({
@@ -243,91 +218,56 @@ async function main() {
     console.log(help);
     return;
   }
-  if (values.title !== undefined ? positionals.length !== 0 : positionals.length < 1 || positionals.length > 2) {
-    usageError('Supply one title, or a section and a title. Do not add extra positional arguments.');
+  if (values.title !== undefined ? positionals.length !== 0 : positionals.length !== 1) {
+    usageError('Supply one title. Use --section for the section.');
   }
-  if (positionals.length === 2 && values.section !== undefined) {
-    usageError('Use either a positional section or --section.');
-  }
-  const sectionArg = values.section ?? (positionals.length === 2 ? positionals[0] : 'New');
-  const title = (values.title ?? positionals[positionals.length - 1]).trim();
+  const section = (values.section ?? 'New').trim();
+  const title = (values.title ?? positionals[0]).trim();
   if (!title || /[\x00-\x1f\x7f]/.test(title)) usageError('The title must have text and no control characters.');
-  if (!cleanName(sectionArg)) usageError('The section name must have text.');
+  if (!section) usageError('The section must have text.');
   for (const key of ['body-file', 'author', 'session']) {
     if (values[key] !== undefined && !values[key].trim()) usageError(`--${key} needs a value with text.`);
   }
 
-  // Keep the old filename rule. Lock the same title in every Mesh section.
+  // Keep the old filename rule: a slash or a backslash in the title becomes "-".
   const safeTitle = title.replace(/[/\\]/g, '-');
-  const filename = `${safeTitle}.md`;
-  const key = titleKey(filename);
-  const lock = await lockTitle(key);
-  let result;
-  try {
-    const files = [...walkMarkdown(meshDir)];
-    const found = findHeader(files, sectionArg);
-    if (!found) {
-      fail('SECTION_NOT_FOUND', `No such section: ${sectionArg}.`,
-        [`flint shard ie section ${quote(cleanName(sectionArg))}`]);
-    }
-    existingNote(files, key);
-
-    let body = '';
-    if (values['body-file'] !== undefined) {
-      try {
-        body = fs.readFileSync(values['body-file'], 'utf8');
-      } catch (error) {
-        fail('BODY_READ_FAILED', `Cannot read body file: ${error.message}`);
-      }
-    }
-    const author = values.author === undefined ? operatorName() : values.author.trim();
-    const session = values.session ?? process.env.ORBH_SESSION_ID;
-    const today = new Date().toISOString().slice(0, 10);
-    const id = crypto.randomUUID();
-    const lines = [
-      '---',
-      `id: ${quote(id)}`,
-      'tags:',
-      '  - "#note"',
-      `  - ${quote(`#ie/sections/${found.slug}`)}`,
-      `description: ${quote(values.description ?? '')}`,
-    ];
-    if (author) lines.push('authors:', `  - ${quote(`[[@${author}]]`)}`);
-    if (session) lines.push('orbh-sessions:', `  - ${quote(`[[${session}]]`)}`);
-    lines.push('template: "[[tmp-ie-note-v0.1]]"', `created: ${today}`, `modified: ${today}`, '---', '', `# ${title}`, '', '');
-    const note = lines.join('\n') + body;
-    const notePath = path.join(path.dirname(found.file), filename);
+  let body = '';
+  if (values['body-file'] !== undefined) {
     try {
-      lock.assertHeld();
-      fs.writeFileSync(notePath, note, { encoding: 'utf8', flag: 'wx' });
+      body = fs.readFileSync(values['body-file'], 'utf8');
     } catch (error) {
-      if (error.code === 'EEXIST') fail('NOTE_EXISTS', `Note already exists: ${path.relative(flintRoot, notePath)}`);
-      throw error;
+      fail('BODY_READ_FAILED', `Cannot read body file: ${error.message}`);
     }
-    if (json) {
-      result = JSON.stringify({
-        ok: true, kind: 'note', name: title,
-        created: [path.relative(flintRoot, notePath).split(path.sep).join('/')],
-        updated: [], warnings: [], next: [], section: found.name, id,
-      });
-    } else {
-      result = notePath;
-    }
-  } finally {
-    lock.release();
   }
-  console.log(result);
+  const author = values.author === undefined ? operatorName() : values.author.trim();
+  const session = values.session ?? process.env.ORBH_SESSION_ID;
+  const today = new Date().toISOString().slice(0, 10);
+  const id = crypto.randomUUID();
+  const lines = ['---', `id: ${quote(id)}`, 'tags:', '  - "#note"', `description: ${quote(values.description ?? '')}`];
+  if (author) lines.push('authors:', `  - ${quote(`[[@${author}]]`)}`);
+  if (session) lines.push('orbh-sessions:', `  - ${quote(`[[${session}]]`)}`);
+  lines.push('template: "[[tmp-ie-note-v0.2]]"', `created: ${today}`, `modified: ${today}`, '---', '', `# ${title}`, '', '');
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'ie-note-'));
+  const contentFile = path.join(folder, 'note.md');
+  let created;
+  try {
+    fs.writeFileSync(contentFile, lines.join('\n') + body, 'utf8');
+    created = meshResult(['create', safeTitle, '--section', section, '--content-file', contentFile]);
+  } finally {
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+  if (json) {
+    console.log(JSON.stringify({
+      ok: true, kind: 'note', name: title, created: [created.path], updated: [], warnings: [], next: [],
+      section: created.section ?? section, id,
+    }));
+  } else {
+    console.log(path.join(flintRoot, created.path));
+  }
 }
 
-main().catch((error) => {
-  const code = error.noteCode || 'NOTE_CREATE_FAILED';
-  const reason = error.message;
-  const next = error.next || [];
-  if (json) {
-    console.log(JSON.stringify({ ok: false, kind: 'note', code, reason, created: [], next }));
-  } else {
-    console.error(reason);
-    for (const command of next) console.error(command);
-  }
-  process.exitCode = 1;
-});
+try {
+  main();
+} catch (error) {
+  report(error, json, 'note');
+}

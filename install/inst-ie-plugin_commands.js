@@ -13,20 +13,22 @@
 //   addCommand,        // bound plugin.addCommand — commands unload with the plugin
 // }
 //
-// Command: "IE: New note in a section" — pick a mesh section (headers found by
-// frontmatter scan, flat mesh), type a title, create the note beside the
-// header (visual default) with the authoritative #ie/sections/<slug> tag.
+// Command: "IE: New note in a section" — pick a mesh section (a header found
+// by a frontmatter scan), type a title, and create the note in the section
+// folder, next to the header, with the section tag #ie/sections/<key>. The
+// folder has meaning: a member of a section is in its section folder.
 
 function register(ctx) {
 	const { app, obsidian, addCommand } = ctx;
 	const { Modal, Setting, Notice } = obsidian;
 
-	// Flat mesh: section headers are files named "(Section) <Name>.md" whose
-	// frontmatter tags include "#ie" plus an "#ie/sections/<slug>" tag.
+	// A section header is the file "(Section) <Name>.md" directly in its section
+	// folder "(Section) <Name>/", with the tags "#ie" and "#ie/sections/<key>".
 	function listHeaders() {
 		const out = [];
 		for (const file of app.vault.getMarkdownFiles()) {
 			if (!file.name.startsWith('(Section) ')) continue;
+			if (!file.parent || file.parent.name !== file.basename) continue;
 			const fm = app.metadataCache.getFileCache(file)?.frontmatter;
 			const tags = fm && Array.isArray(fm.tags) ? fm.tags : [];
 			if (!tags.some((t) => String(t).replace(/^#/, '') === 'ie')) continue;
@@ -60,7 +62,7 @@ function register(ctx) {
 			'description: \n' +
 			'contact: \n' +
 			'orbh-sessions: \n' +
-			'template: "[[tmp-ie-note-v0.1]]"\n' +
+			'template: "[[tmp-ie-note-v0.2]]"\n' +
 			`created: ${today}\n` +
 			`modified: ${today}\n` +
 			'---\n\n' +
