@@ -4,13 +4,17 @@ description: "Group definition — the optional document that names a mesh group
 
 # Filename: Mesh/Groups/(Group) [Name].md
 
-/* A group is a named set of documents that cuts across sections. The group tag
-   "#ie/groups/[key]" on a document is the only authority for membership: a
-   group exists when one document has the tag. This definition is OPTIONAL. It
-   names the group and states its intent. It has its own group tag, so it is a
-   member of its group. It can be in any folder; the place of a file has no
-   meaning for a group. Create it with `flint shard ie group "[Name]"` (it calls
-   `mesh group create`, which writes it in [groups] folder), then write the
+/* A group is a named set of documents that cuts across sections.
+   The group tag "#ie/groups/[key]" on a document is the only authority for
+   membership. A group exists in two ways:
+   - one document or more has the group tag, or
+   - a valid definition "(Group) [Name]" declares it, also when no document
+     has the tag yet (the group then has zero members).
+   This definition is OPTIONAL. It names the group and states its intent. It
+   has its own group tag, so it is a member of its group. It can be in any
+   folder: the place of a file has no meaning for a group.
+   Create it with `flint shard ie group "[Name]"`. The script calls
+   `mesh group create`, which writes it in [groups] folder. Then write the
    description and the criteria. */
 
 ```markdown

@@ -18,24 +18,40 @@
 // folder, next to the header, with the section tag #ie/sections/<key>. The
 // folder has meaning: a member of a section is in its section folder.
 
+// The section name grammar and the key fold (Spec: Mesh Section and Group Model . Sections, 1).
+const SECTION_NAME = /^[A-Z0-9][A-Za-z0-9]*( [A-Z0-9][A-Za-z0-9]*)*$/;
+
+function sectionKey(name) {
+	return name.split(' ').filter(Boolean).map((word) => word.toLowerCase()).join('-');
+}
+
+// The section of a header file, or null. A header is the file "(Section) <Name>.md"
+// directly in its section folder "(Section) <Name>/". The name follows the grammar.
+// Its tags hold "#ie" and exactly one section tag: the key fold of the name.
+function headerSection(file, tags) {
+	if (!file.name.startsWith('(Section) ')) return null;
+	if (!file.parent || file.parent.name !== file.basename) return null;
+	const name = file.basename.slice('(Section) '.length);
+	if (name.length < 1 || name.length > 64 || !SECTION_NAME.test(name)) return null;
+	const names = (Array.isArray(tags) ? tags : []).map((tag) => String(tag).trim().replace(/^#/, '').trim());
+	if (!names.includes('ie')) return null;
+	const sectionTags = [...new Set(names.filter((tag) => tag.startsWith('ie/sections/')))];
+	const key = sectionKey(name);
+	if (sectionTags.length !== 1 || sectionTags[0] !== `ie/sections/${key}`) return null;
+	return { key, name };
+}
+
 function register(ctx) {
 	const { app, obsidian, addCommand } = ctx;
 	const { Modal, Setting, Notice } = obsidian;
 
-	// A section header is the file "(Section) <Name>.md" directly in its section
-	// folder "(Section) <Name>/", with the tags "#ie" and "#ie/sections/<key>".
+	// The valid section headers of the vault (see headerSection).
 	function listHeaders() {
 		const out = [];
 		for (const file of app.vault.getMarkdownFiles()) {
-			if (!file.name.startsWith('(Section) ')) continue;
-			if (!file.parent || file.parent.name !== file.basename) continue;
 			const fm = app.metadataCache.getFileCache(file)?.frontmatter;
-			const tags = fm && Array.isArray(fm.tags) ? fm.tags : [];
-			if (!tags.some((t) => String(t).replace(/^#/, '') === 'ie')) continue;
-			const match = tags.map((t) => String(t).replace(/^#/, '')).find((t) => t.startsWith('ie/sections/'));
-			if (!match) continue;
-			const slug = match.slice('ie/sections/'.length);
-			out.push({ file, slug, name: file.basename.replace(/^\(Section\)\s*/, '') });
+			const section = headerSection(file, fm ? fm.tags : []);
+			if (section) out.push({ file, slug: section.key, name: section.name });
 		}
 		return out.sort((a, b) => a.name.localeCompare(b.name));
 	}
@@ -148,4 +164,4 @@ function register(ctx) {
 	});
 }
 
-module.exports = { register };
+module.exports = { register, headerSection };

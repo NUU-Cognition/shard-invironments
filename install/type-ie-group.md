@@ -7,7 +7,23 @@ tags:
 
 # Group
 
-A Group is the optional definition of a mesh group: a named set of documents that cuts across mesh sections. The group tag `#ie/groups/<key>` on a document is the only authority for membership. A document can be in any number of groups, from any section or from no section, and the place of a file has no meaning for a group. A section says where a document is (zero or one answer); groups say what a document is part of (any number of answers). The definition `(Group) <Name>.md` names the group, states its intent, and has its own group tag, so it is a member of its group. A valid definition declares its group, also when no document has the tag yet. A group key uses the section key grammar, and a definition name uses the section name grammar.
+A Group is the optional definition of a mesh group.
+
+- A mesh group is a named set of documents.
+- A group cuts across mesh sections.
+- The group tag `#ie/groups/<key>` on a document is the only authority for membership.
+- A document can be in any number of groups.
+- A member can be in any section, or in no section.
+- The place of a file has no meaning for a group.
+- A section says where a document is: zero or one answer.
+- Groups say what a document is part of: any number of answers.
+- The definition `(Group) <Name>.md` names the group.
+- The definition states the intent of the group.
+- The definition has its own group tag, so it is a member of its group.
+- A group exists when a document has its tag.
+- A valid definition also declares its group when no document has the tag yet.
+- A group key uses the section key grammar.
+- A definition name uses the section name grammar.
 
 ## Properties
 

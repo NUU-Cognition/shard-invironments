@@ -7,7 +7,19 @@ tags:
 
 # Note
 
-A Note is the atomic unit of semantic content: a single editable model, a slice of reality written as standalone markdown. Its title is the slice it represents (a complete claim or concept). A note has zero or one section tag `#ie/sections/<key>`; a note with a section tag is in the folder of that section (or a subfolder of it), and a note with no section tag is unsectioned. It can have any number of `#ie/groups/<key>` group tags. A Note is minimal: one universal kind, no subtypes. It has a required one-line `description` (its scent in `ie load`) and optional `contact` reality anchors. It holds durable understanding, not an action to complete, and it is revised in place, not appended to.
+A Note is the atomic unit of semantic content.
+
+- A note is a single editable model: a slice of reality as standalone markdown.
+- The title is the slice: a complete claim or concept.
+- A note has zero or one section tag `#ie/sections/<key>`.
+- A note with a section tag is in the folder of that section, or in a subfolder of it.
+- A note with no section tag is unsectioned.
+- A note can have any number of group tags `#ie/groups/<key>`.
+- A note has one universal kind and no subtypes.
+- A note has a required one-line `description`: its scent in `ie load`.
+- A note can have `contact` reality anchors.
+- A note holds durable understanding, not an action to complete.
+- A note is revised in place, not appended to.
 
 ## Properties
 

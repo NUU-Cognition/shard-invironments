@@ -34,7 +34,7 @@ flint shard ie load "<Section>"                         # header + member scent 
 ## Structure
 
 ```
-Shards/(Dev Remote) Invironments/
+Shards/(Source Remote) Invironments/
   shard.yaml                      # Manifest — types Section, Group, Note (folders are Flint's)
   dev-init-ie.md                  # Init — grammar + rules
   knowledge/
