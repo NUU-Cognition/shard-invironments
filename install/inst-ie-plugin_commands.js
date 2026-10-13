@@ -25,14 +25,22 @@ function sectionKey(name) {
 	return name.split(' ').filter(Boolean).map((word) => word.toLowerCase()).join('-');
 }
 
+function validName(name) {
+	return name.length >= 1 && name.length <= 64 && SECTION_NAME.test(name);
+}
+
 // The section of a header file, or null. A header is the file "(Section) <Name>.md"
 // directly in its section folder "(Section) <Name>/". The name follows the grammar.
-// Its tags hold "#ie" and exactly one section tag: the key fold of the name.
+// The folder is not inside another valid section folder (a nested folder declares
+// no section; the rule of mesh-core). The tags hold "#ie" and exactly one section
+// tag: the key fold of the name.
 function headerSection(file, tags) {
 	if (!file.name.startsWith('(Section) ')) return null;
 	if (!file.parent || file.parent.name !== file.basename) return null;
 	const name = file.basename.slice('(Section) '.length);
-	if (name.length < 1 || name.length > 64 || !SECTION_NAME.test(name)) return null;
+	if (!validName(name)) return null;
+	const above = String(file.parent.path || '').split('/').slice(0, -1);
+	if (above.some((segment) => segment.startsWith('(Section) ') && validName(segment.slice('(Section) '.length)))) return null;
 	const names = (Array.isArray(tags) ? tags : []).map((tag) => String(tag).trim().replace(/^#/, '').trim());
 	if (!names.includes('ie')) return null;
 	const sectionTags = [...new Set(names.filter((tag) => tag.startsWith('ie/sections/')))];
