@@ -1,3 +1,10 @@
+# 0.2.2
+
+- The `note` JSON output now reads the normalized section key from the section tag that `mesh create` returns.
+- The script no longer reads the absent `section` field of the create result.
+
+---
+
 # 0.2.1
 
 - The `section`, `note`, `group`, `list`, and `load` scripts now read the flat JSON envelope of the mesh CLI.

@@ -257,9 +257,13 @@ function main() {
     fs.rmSync(folder, { recursive: true, force: true });
   }
   if (json) {
+    const sectionTag = created.tags.find((tag) => tag.startsWith('#ie/sections/'));
+    if (sectionTag === undefined) {
+      fail('MESH_RESULT_INVALID', 'The mesh create result has no section tag.');
+    }
     console.log(JSON.stringify({
       ok: true, kind: 'note', name: title, created: [created.path], updated: [], warnings: [], next: [],
-      section: created.section ?? section, id,
+      section: sectionTag.slice('#ie/sections/'.length), id,
     }));
   } else {
     console.log(path.join(flintRoot, created.path));
