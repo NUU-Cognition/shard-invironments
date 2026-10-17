@@ -43,28 +43,28 @@ function mesh(args, input) {
   return { status: run.status, lines, stderr: run.stderr };
 }
 
-// The result of one mesh command, or a failure with its message and next commands.
+// The data of one mesh command, or a failure with its reason and next commands.
 function meshResult(args, input) {
   const { status, lines, stderr } = mesh(args, input);
   const envelope = lines[lines.length - 1];
-  if (status === 0 && envelope && envelope.ok) return envelope.result;
-  if (envelope && /Unknown command/i.test(envelope.message || '')) {
+  if (status === 0 && envelope && envelope.ok) return envelope;
+  if (envelope && /Unknown command/i.test(envelope.reason || '')) {
     fail('MESH_CLI_OLD', `The mesh CLI has no "${args.slice(0, 2).join(' ')}" command. Install the mesh CLI with the section and group commands.`);
   }
-  fail(envelope ? envelope.code : 'MESH_FAILED', envelope ? envelope.message : (stderr || `mesh exited ${status}`).trim(), (envelope && envelope.next) || []);
+  fail(envelope ? envelope.code : 'MESH_FAILED', envelope ? envelope.reason : (stderr || `mesh exited ${status}`).trim(), (envelope && envelope.next) || []);
 }
 
-// The results of an atomic batch (one per request), or a failure with the message of the first failed request.
+// The data of an atomic batch (one envelope per request), or the reason of the first failed request.
 function meshBatch(requests) {
   const { status, lines, stderr } = mesh(['batch', '--atomic'], requests.map((request) => JSON.stringify(request)).join('\n') + '\n');
   const envelope = lines[lines.length - 1];
-  const results = (envelope && envelope.result && envelope.result.results) || [];
-  if (status === 0 && results.length === requests.length && results.every((line) => line.ok)) return results.map((line) => line.result);
+  const results = (envelope && envelope.results) || [];
+  if (status === 0 && results.length === requests.length && results.every((line) => line.ok)) return results;
   const failed = results.find((line) => !line.ok && line.code !== 'NOT_APPLIED' && line.code !== 'SKIPPED') || (envelope && !envelope.ok ? envelope : undefined);
-  if (failed && /unknown command/i.test(failed.message || '')) {
+  if (failed && /unknown command/i.test(failed.reason || '')) {
     fail('MESH_CLI_OLD', 'The mesh CLI has no section or group commands. Install the mesh CLI with the section and group commands.');
   }
-  fail(failed ? failed.code : 'MESH_FAILED', failed ? failed.message : (stderr || `mesh batch exited ${status}`).trim(), (failed && failed.next) || []);
+  fail(failed ? failed.code : 'MESH_FAILED', failed ? failed.reason : (stderr || `mesh batch exited ${status}`).trim(), (failed && failed.next) || []);
 }
 
 // Print a failure: one JSON object with --json, else the reason and the next commands. Exit 1.

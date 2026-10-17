@@ -1,3 +1,11 @@
+# 0.2.1
+
+- The `section`, `note`, `group`, `list`, and `load` scripts now read the flat JSON envelope of the mesh CLI.
+- The scripts read command data from the top level. They read failure text from `reason`.
+- The batch reader now reads top-level `results`. It returns each flat result line.
+
+---
+
 # 0.2.0
 
 The section and group model of `(Spec) Mesh Section and Group Model` (NUU Mesh Flint, Task 696).
