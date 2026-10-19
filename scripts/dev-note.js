@@ -95,7 +95,8 @@ anywhere in the mesh, and expands the tokens {{id}}, {{date}}, {{title}},
 {{number}}, {{author}}, and {{session}} in the content.
 The default author is FLINT_OPERATOR_NAME from the CLI.
 Without it, read name in $NUU_HOME/config.toml (or ~/.nuucognition/config.toml).
-The default session is ORBH_SESSION_ID. Use --help or -h to show this help.
+The default session is ORBH_SESSION_ID. The note stamps it in orb: (flint address me).
+Use --help or -h to show this help.
 The mesh CLI is MESH_BIN, else mesh on the PATH.`;
 
 function usageError(reason) {
@@ -193,6 +194,62 @@ function quote(value) {
     (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }
 
+// The shape of an Orbh session id: 8-4-4-4-12 hex.
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The org of [flint] in flint.toml, or '' when the Flint has no org (a local Flint).
+function flintOrg() {
+  let text;
+  try {
+    text = fs.readFileSync(path.join(flintRoot, 'flint.toml'), 'utf8');
+  } catch {
+    return '';
+  }
+  let inFlint = false;
+  for (const line of text.split(/\r?\n/)) {
+    const table = /^\s*\[\[?([^\]]*)\]\]?\s*(?:#.*)?$/.exec(line);
+    if (table) {
+      inFlint = table[1].trim() === 'flint';
+      continue;
+    }
+    const org = inFlint ? /^\s*org\s*=\s*(?:"([^"]*)"|'([^']*)')\s*(?:#.*)?$/.exec(line) : null;
+    if (org) {
+      const slug = (org[1] !== undefined ? org[1] : org[2]).trim();
+      return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : '';
+    }
+  }
+  return '';
+}
+
+// The address of the session for orb: (NUU Orbh Mission 027): the `by` of `flint address me --json`.
+// A CLI with no `flint address me` gives the short form @v1/<org>/session/<uuid>.
+// A session that is not a UUID gives a warning and null (no stamp). The script never parses an address.
+function sessionAddress(session) {
+  const id = String(session).trim().toLowerCase();
+  if (!SESSION_ID.test(id)) {
+    process.stderr.write(`warning: session ${JSON.stringify(session)} is not a session UUID: no orb stamp\n`);
+    return null;
+  }
+  // SIGKILL: a child that ignores SIGTERM must not hold the command after the timeout.
+  const result = spawnSync('flint', ['address', 'me', '--json'], {
+    cwd: flintRoot,
+    env: { ...process.env, ORBH_SESSION_ID: id },
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 15000,
+    killSignal: 'SIGKILL',
+  });
+  if (!result.error && result.status === 0) {
+    try {
+      const { by } = JSON.parse(result.stdout);
+      if (typeof by === 'string' && by.startsWith('@v1/') && !/\s/.test(by)) return by;
+    } catch {
+      // The output is not v1 JSON: use the short form.
+    }
+  }
+  return `@v1/${flintOrg()}/session/${id}`;
+}
+
 function main() {
   let parsed;
   try {
@@ -240,12 +297,17 @@ function main() {
     }
   }
   const author = values.author === undefined ? operatorName() : values.author.trim();
+  // The orb: stamp. The note is a new file, so it has no stamp yet, and the stamp has one item.
+  // The script writes no orbh-sessions. It asks the CLI for the address before the mesh call:
+  // the lock of mesh create stays short. A Flint with no mesh root stops before the CLI call.
   const session = values.session ?? process.env.ORBH_SESSION_ID;
+  requireMeshRoot();
+  const address = session ? sessionAddress(session) : null;
   const today = new Date().toISOString().slice(0, 10);
   const id = crypto.randomUUID();
   const lines = ['---', `id: ${quote(id)}`, 'tags:', '  - "#note"', `description: ${quote(values.description ?? '')}`];
   if (author) lines.push('authors:', `  - ${quote(`[[@${author}]]`)}`);
-  if (session) lines.push('orbh-sessions:', `  - ${quote(`[[${session}]]`)}`);
+  if (address) lines.push('orb:', `  - ${quote(address)}`);
   lines.push('template: "[[tmp-ie-note-v0.2]]"', `created: ${today}`, `modified: ${today}`, '---', '', `# ${title}`, '', '');
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'ie-note-'));
   const contentFile = path.join(folder, 'note.md');

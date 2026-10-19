@@ -1,5 +1,8 @@
 ---
 description: "Review a mesh section and refresh its header — keep the context envelope and navigation guide current as members accumulate"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
+  - "@v1/nuucognition/session/11ee491c-0bce-4b77-8d97-aa78c6a34ccf#flint/nuu-flint"
 ---
 
 > [!important] THIS FILE IS AN INSTRUCTION. WHEN REFERENCED IT IS MEANT TO BE TAKEN AS AN ACTION.
@@ -35,7 +38,7 @@ Bring a section's header back in line with its members. The member *list* never 
 
 - Write the approved prose into the header file
 - Bump the header's `modified` date
-- Append your session id to the header's `orbh-sessions`
+- Stamp your session in `orb:` of the header: run `flint address me`, and append its `by` address (quoted) to `orb:`. Add nothing only when `orb:` or `orbh-sessions` has an item that is exactly your `by` address, the short form `@v1/<org>/session/<uuid>`, `[[<uuid>]]`, or your bare `<uuid>`. Old notes keep `orbh-sessions`: never remove it, and add no new item to it. The full rule is in [[knw-f-artifacts]] § Session Tracking.
 - Confirm the refresh with the user
 
 # Output

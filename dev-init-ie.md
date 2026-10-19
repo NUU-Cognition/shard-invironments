@@ -2,6 +2,9 @@
 orbh-sessions: [b0789b67-a355-4721-a49b-5763a95aa3c4, b37f454a-9107-4acd-8b19-7da95177ddfe]
 required-reading:
   - "[[dev-knw-ie-model]]"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
+  - "@v1/nuucognition/session/11ee491c-0bce-4b77-8d97-aa78c6a34ccf#flint/nuu-flint"
 ---
 
 # Invironments
@@ -84,7 +87,12 @@ A `<section>` argument is the section name, the key, or the header title.
 The default author of a note is the operator Name from the CLI, passed in `FLINT_OPERATOR_NAME`.
 Without that variable, the script reads top-level `name` from `$NUU_HOME/config.toml`, or `~/.nuucognition/config.toml`.
 Use `--author` to override the default author. If no Name exists, the note has no `authors` field.
-The default session is `ORBH_SESSION_ID`. The note stores it as a wikilink in `orbh-sessions`.
+The default session is `ORBH_SESSION_ID`. Use `--session` to override it. The note stamps the session in `orb:` with the `by` address of `flint address me`.
+When the CLI has no `flint address me`, the note gets the short form `@v1/<org>/session/<uuid>` (the org of `[flint] org` in `flint.toml`).
+A session that is not a UUID gives a warning and no stamp.
+`flint shard ie section` and `flint shard ie group` stamp `ORBH_SESSION_ID` in `orb:` in the same way. With no session, the scripts write no `orb:`.
+Each script asks the CLI for the address before it calls the `mesh` CLI, so the lock of the mesh transaction stays short. The scripts write no `orbh-sessions`.
+Old notes keep `orbh-sessions`: never remove it, and add no new item to it. The full rule is in [[knw-f-artifacts]] § Session Tracking.
 The `mesh` CLI refuses a title or case collision anywhere in the mesh (exit 9) and never overwrites a file.
 `--json` returns one result object. Errors return `ok: false` and a nonzero exit code.
 Use `flint shard ie note --help` for the note syntax.

@@ -85,7 +85,7 @@ function register(ctx) {
 			`  - "#ie/sections/${header.slug}"\n` +
 			'description: \n' +
 			'contact: \n' +
-			'orbh-sessions: \n' +
+			'orb: \n' +
 			'template: "[[tmp-ie-note-v0.2]]"\n' +
 			`created: ${today}\n` +
 			`modified: ${today}\n` +

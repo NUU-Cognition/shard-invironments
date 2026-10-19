@@ -1,5 +1,8 @@
 ---
 description: "Create a mesh section — create the (Section) folder and header with the mesh CLI, then write its context envelope and navigation prose"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
+  - "@v1/nuucognition/session/11ee491c-0bce-4b77-8d97-aa78c6a34ccf#flint/nuu-flint"
 ---
 
 > [!important] THIS FILE IS AN INSTRUCTION. WHEN REFERENCED IT IS MEANT TO BE TAKEN AS AN ACTION.
@@ -35,7 +38,7 @@ Create a mesh section: the section folder `(Section) <Name>/` and its header, in
 3. **Complete the frontmatter.** In the header:
    - Write a one-line `description:` (how the section reads in listings), if `--description` did not give it.
    - Add `authors` with the operator person wikilink (from `flint whoami`); omit it if no Name is set.
-   - Make sure your session id is in `orbh-sessions`.
+   - Stamp your session in `orb:`: run `flint address me`, and append its `by` address (quoted) to `orb:`. The script already stamps `ORBH_SESSION_ID`. Add nothing only when `orb:` or `orbh-sessions` has an item that is exactly your `by` address, the short form `@v1/<org>/session/<uuid>`, `[[<uuid>]]`, or your bare `<uuid>`. The full rule is in [[knw-f-artifacts]] § Session Tracking.
 
 4. **Confirm.** Report the header path. If it helps, suggest the first notes with `flint shard ie note "<Title>" --section "<Name>"`.
 

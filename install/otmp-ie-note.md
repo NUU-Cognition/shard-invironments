@@ -38,7 +38,7 @@ tags:
   - "#note"<% sectionTag %>
 description: 
 contact: 
-orbh-sessions: 
+orb:
 template: "[[tmp-ie-note-v0.2]]"
 created: <% today %>
 modified: <% today %>

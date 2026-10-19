@@ -83,6 +83,65 @@ function report(error, json, kind) {
   process.exitCode = 1;
 }
 
+// The shape of an Orbh session id: 8-4-4-4-12 hex.
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The org of [flint] in flint.toml, or '' when the Flint has no org (a local Flint).
+function flintOrg() {
+  let text;
+  try {
+    text = fs.readFileSync(path.join(flintRoot, 'flint.toml'), 'utf8');
+  } catch {
+    return '';
+  }
+  let inFlint = false;
+  for (const line of text.split(/\r?\n/)) {
+    const table = /^\s*\[\[?([^\]]*)\]\]?\s*(?:#.*)?$/.exec(line);
+    if (table) {
+      inFlint = table[1].trim() === 'flint';
+      continue;
+    }
+    const org = inFlint ? /^\s*org\s*=\s*(?:"([^"]*)"|'([^']*)')\s*(?:#.*)?$/.exec(line) : null;
+    if (org) {
+      const slug = (org[1] !== undefined ? org[1] : org[2]).trim();
+      return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : '';
+    }
+  }
+  return '';
+}
+
+// The address of ORBH_SESSION_ID for orb: (NUU Orbh Mission 027): the `by` of `flint address me --json`.
+// A CLI with no `flint address me` gives the short form @v1/<org>/session/<uuid>.
+// No session gives null. A session that is not a UUID gives a warning and null (no stamp).
+// The script never parses an address.
+function sessionAddress() {
+  const session = process.env.ORBH_SESSION_ID;
+  if (!session) return null;
+  const id = session.trim().toLowerCase();
+  if (!SESSION_ID.test(id)) {
+    process.stderr.write(`warning: ORBH_SESSION_ID ${JSON.stringify(session)} is not a session UUID: no orb stamp\n`);
+    return null;
+  }
+  // SIGKILL: a child that ignores SIGTERM must not hold the command after the timeout.
+  const result = spawnSync('flint', ['address', 'me', '--json'], {
+    cwd: flintRoot,
+    env: { ...process.env, ORBH_SESSION_ID: id },
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 15000,
+    killSignal: 'SIGKILL',
+  });
+  if (!result.error && result.status === 0) {
+    try {
+      const { by } = JSON.parse(result.stdout);
+      if (typeof by === 'string' && by.startsWith('@v1/') && !/\s/.test(by)) return by;
+    } catch {
+      // The output is not v1 JSON: use the short form.
+    }
+  }
+  return `@v1/${flintOrg()}/session/${id}`;
+}
+
 const usage = 'Usage: flint shard ie section "<Name>" [--in <folder>] [--kind open|closed] [--description <text>] [--json]';
 const help = `${usage}
 
@@ -91,6 +150,7 @@ A name has words of letters and digits. Each word starts with a capital letter o
 digit. One space separates two words. 1 to 64 characters, no hyphen or other
 punctuation. The key is the name in lowercase with "-" between the words.
 The parent folder is --in (mesh-root-relative), else [sections] folder of mesh.toml.
+The header stamps ORBH_SESSION_ID in orb: (flint address me).
 The mesh CLI is MESH_BIN, else mesh on the PATH.`;
 
 const json = process.argv.includes('--json');
@@ -124,8 +184,16 @@ function main() {
   }
   const header = `(Section) ${name}`;
   const today = new Date().toISOString().slice(0, 10);
-  const fields = [`template=[[tmp-ie-section-v0.2]]`, `created=${today}`, `modified=${today}`];
-  if (process.env.ORBH_SESSION_ID) fields.push(`orbh-sessions=${JSON.stringify([`[[${process.env.ORBH_SESSION_ID}]]`])}`);
+  // The orb: stamp goes into the props.set request, after section.create in the same atomic batch.
+  // The header is a new file, so it has no stamp yet, and the stamp has one item. The script writes
+  // no orbh-sessions. It asks the CLI for the address before the batch: the lock of the batch stays
+  // short. A Flint with no mesh root stops before the CLI call. orb comes first, so that the new key
+  // is before template in the header.
+  requireMeshRoot();
+  const address = sessionAddress();
+  const fields = [];
+  if (address) fields.push(`orb=${JSON.stringify([address])}`);
+  fields.push(`template=[[tmp-ie-section-v0.2]]`, `created=${today}`, `modified=${today}`);
   const body = `\n# ${name}\n\n> Context envelope: what a mind must already hold to read the members of this section.\n\n## Navigation\n\n`;
   const [created] = meshBatch([
     {

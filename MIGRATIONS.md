@@ -2,6 +2,12 @@
 
 Migration notes for Invironments. Latest version at top, separated by `---`.
 
+# 0.2.3
+
+- No migration step. New notes, sections, and groups get `orb:`. Old documents keep `orbh-sessions`: the shard does not rewrite them (NUU Orbh Mission 027).
+
+---
+
 # 0.2.0
 
 - No migration step in the shard. The rules change, and existing data can break them: a section tag with no section folder and header (`SECTION_UNKNOWN`), a member outside its section folder (`SECTION_FOLDER_MISMATCH`), a nested key such as `main/working` (`SECTION_NAME_INVALID`), or two section tags (`MULTIPLE_SECTIONS`). Run `mesh check` to find them, and `mesh section fix` to repair the folder disagreements. The data migration of a Flint is a separate task: for NUU Mesh, see `(Spec) Mesh Section and Group Model . Migration`.

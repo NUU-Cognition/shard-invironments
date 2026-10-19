@@ -1,5 +1,8 @@
 ---
 description: "IE note — one editable slice of reality, in zero or one mesh section"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
+  - "@v1/nuucognition/session/11ee491c-0bce-4b77-8d97-aa78c6a34ccf#flint/nuu-flint"
 ---
 
 # Filename: [the folder of its section (or a subfolder), else the mesh folder]/[Note Title].md
@@ -24,8 +27,9 @@ description: [One high-scent line. This is what `ie load` discloses. Required �
              a note with no description is invisible to the loader.]
 contact: /* optional; omit the field entirely if the note has no reality anchor */
   - "[[cb-[codebase]]]"
-orbh-sessions: /* from --session or ORBH_SESSION_ID; omit if neither exists */
-  - "[[agent-session-uuid]]"
+orb: /* the by address of flint address me for --session or ORBH_SESSION_ID;
+       omit if neither exists */
+  - "[the by address of flint address me]"
 template: "[[tmp-ie-note-v0.2]]"
 authors: /* from flint whoami; omit if no name set */
   - "[[@Person Name]]"
@@ -54,4 +58,11 @@ modified: [YYYY-MM-DD]
    - contact and the "# Contact" section are both optional and travel together;
      omit both when the note has no reality anchor.
    - modified: bump on substantive edits (convention, not enforced).
+   - `orb:` holds the session stamps (NUU Orbh Mission 027). Each item is the
+     quoted `by` address of `flint address me`. An agent that edits the
+     note appends its address. It adds nothing only when `orb:` or
+     `orbh-sessions` has an item that is exactly its `by` address, the short
+     form `@v1/<org>/session/<uuid>`, `[[<uuid>]]`, or its bare `<uuid>`. Old
+     documents keep `orbh-sessions`: never remove it, and add no new item to
+     it. The full rule is in [[knw-f-artifacts]] § Session Tracking.
 */

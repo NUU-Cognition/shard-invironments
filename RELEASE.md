@@ -1,3 +1,18 @@
+# 0.2.3
+
+The `orb:` stamp rule (NUU Orbh Mission 027, Task jn77hb87), ported from `1b5b464` of the 0.1 line (Invironments 0.1.3).
+
+- The `note`, `section`, and `group` scripts stamp the session in `orb:`. The stamp is the `by` address of `flint address me --json`. When the CLI has no `flint address me`, the stamp is the short form `@v1/<org>/session/<uuid>` (the org of `[flint] org` in `flint.toml`). The scripts never parse an address.
+- The session of `note` is `--session`, else `ORBH_SESSION_ID`. The session of `section` and `group` is `ORBH_SESSION_ID`. A session that is not a UUID gives a warning and no stamp. With no session, the scripts write no `orb:`.
+- The `note` script writes `orb:` in the content file of `mesh create --section`. The `section` and `group` scripts write `orb:` with the `props.set` request of the atomic batch, after `section.create` or `group.create`. The file is new, so the stamp has one item.
+- Each script asks the CLI for the address before it calls the `mesh` CLI, so the lock of the mesh transaction stays short. A Flint with no mesh root stops before the CLI call.
+- The scripts write no `orbh-sessions`. Old notes keep `orbh-sessions`: never remove it, and add no new item to it.
+- The plugin command and the Templater note template write an empty `orb:`.
+- The init, the refresh workflow, the `create_section` skill, and the v0.2 templates state the `orb:` stamp rule. The superseded v0.1 notices do not change.
+- The folder rule, the section tag rule, and `section-kind` do not change.
+
+---
+
 # 0.2.2
 
 - The `note` JSON output now reads the normalized section key from the section tag that `mesh create` returns.

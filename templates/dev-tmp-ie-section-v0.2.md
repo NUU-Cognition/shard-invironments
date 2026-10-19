@@ -1,5 +1,8 @@
 ---
 description: "Section header — the (Section) <Name> document directly in its section folder: the kind, the context envelope, and the navigation guide"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
+  - "@v1/nuucognition/session/11ee491c-0bce-4b77-8d97-aa78c6a34ccf#flint/nuu-flint"
 ---
 
 # Filename: Mesh/[parent folder/](Section) [Name]/(Section) [Name].md
@@ -31,7 +34,9 @@ section-kind: [open | closed] /* optional; no value means open. In a closed
                                  member of the same section (mesh check reports
                                  SECTION_NOT_CLOSED). */
 description: [One high-scent line — how this section reads in listings.]
-orbh-sessions:
+orb: /* the by address of flint address me for ORBH_SESSION_ID; the script
+       omits it when there is no session */
+  - "[the by address of flint address me]"
 template: "[[tmp-ie-section-v0.2]]"
 authors: /* from flint whoami; omit if no name set */
   - "[[@Person Name]]"
@@ -61,4 +66,11 @@ modified: [YYYY-MM-DD]
    - To rename, move, merge, or delete a section, use the `mesh section`
      commands. They keep the folder, the header, and the member tags in
      agreement in one transaction.
+   - `orb:` holds the session stamps (NUU Orbh Mission 027). Each item is the
+     quoted `by` address of `flint address me`. An agent that edits the
+     header appends its address. It adds nothing only when `orb:` or
+     `orbh-sessions` has an item that is exactly its `by` address, the short
+     form `@v1/<org>/session/<uuid>`, `[[<uuid>]]`, or its bare `<uuid>`. Old
+     documents keep `orbh-sessions`: never remove it, and add no new item to
+     it. The full rule is in [[knw-f-artifacts]] § Session Tracking.
 */
