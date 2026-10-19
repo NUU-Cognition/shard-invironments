@@ -1,5 +1,7 @@
 ---
 description: "Group definition — names a mesh group and says what belongs in it"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
 ---
 
 # Filename: Mesh/Groups/(Group) [Name].md
@@ -17,7 +19,8 @@ tags:
   - "#ie/groups/[slug]" /* the group's own tag — the definition is a member of
                            its own collection. Slug: lowercase, spaces → hyphens. */
 description: [One high-scent line — what this group collects.]
-orbh-sessions:
+orb:
+  - "[the output of flint address me]"
 template: "[[tmp-ie-group-v0.1]]"
 authors: /* from flint whoami; omit if no name set */
   - "[[@Person Name]]"

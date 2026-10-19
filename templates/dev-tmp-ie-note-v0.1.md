@@ -1,5 +1,7 @@
 ---
 description: "IE note â€” one editable slice of reality living in a single mesh section"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
 ---
 
 # Filename: [beside its section's header, or in Mesh/Main/(Section) New/]/[Note Title].md
@@ -21,8 +23,8 @@ description: [One high-scent line. This is what `ie load` discloses. Required â€
              a note with no description is invisible to the loader.]
 contact: /* optional; omit the field entirely if the note has no reality anchor */
   - "[[cb-[codebase]]]"
-orbh-sessions: /* from --session or ORBH_SESSION_ID; omit if neither exists */
-  - "[[agent-session-uuid]]"
+orb: /* the by address of flint address me, for --session or ORBH_SESSION_ID; omit if neither exists */
+  - "[the output of flint address me]"
 template: "[[tmp-ie-note-v0.1]]"
 authors: /* from flint whoami; omit if no name set */
   - "[[@Person Name]]"

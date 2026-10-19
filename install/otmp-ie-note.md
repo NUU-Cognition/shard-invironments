@@ -22,7 +22,7 @@ tags:
   - "#ie/sections/<% slug %>"
 description: 
 contact: 
-orbh-sessions: 
+orb: 
 template: "[[tmp-ie-note-v0.1]]"
 created: <% today %>
 modified: <% today %>

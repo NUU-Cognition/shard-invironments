@@ -1,5 +1,7 @@
 ---
 description: "Section header — the artifact that upgrades a mesh section to a managed environment: context envelope plus navigation guide"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
 ---
 
 # Filename: Mesh/Sections/[display path/](Section) [Name]/(Section) [Name].md
@@ -19,7 +21,8 @@ tags:
                              Slug: lowercase name, spaces → hyphens.
                              Section names are flat and unique across the mesh. */
 description: [One high-scent line — how this section reads in listings.]
-orbh-sessions:
+orb:
+  - "[the output of flint address me]"
 template: "[[tmp-ie-section-v0.1]]"
 authors: /* from flint whoami; omit if no name set */
   - "[[@Person Name]]"

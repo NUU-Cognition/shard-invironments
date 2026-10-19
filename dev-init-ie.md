@@ -2,6 +2,8 @@
 orbh-sessions: [b0789b67-a355-4721-a49b-5763a95aa3c4]
 required-reading:
   - "[[dev-knw-ie-model]]"
+orb:
+  - "@v1/nuucognition/session/9f552ce0-0455-44ed-b8ec-d749c3ae9b2f#flint/nuu-orbh"
 ---
 
 # Invironments
@@ -72,7 +74,11 @@ Without that variable, the script reads top-level `name` from `$NUU_HOME/config.
 The fallback supports basic, literal, and multiline TOML strings.
 Use `--author` to override the default author.
 If no Name exists, the note has no `authors` field.
-The default session is `ORBH_SESSION_ID`. The note stores it as a wikilink in `orbh-sessions`.
+The default session is `ORBH_SESSION_ID`. The note stamps it in `orb:` with the `by` address of `flint address me`.
+When the CLI has no `flint address me`, the note gets the short form `@v1/<org>/session/<uuid>` (the org of `flint.toml`).
+A session that is not a UUID gives a warning and no stamp.
+`flint shard ie section` and `flint shard ie group` stamp `ORBH_SESSION_ID` in `orb:` in the same way. With no session, `orb:` is empty.
+Old notes keep `orbh-sessions`: never remove it, and add no new item to it. The full rule is in [[knw-f-artifacts]] § Session Tracking.
 The title check covers all Markdown filenames under `Mesh/`.
 It ignores letter case and uses Unicode NFC normalization.
 A lock for the normalized title protects the scan and creation across all sections.
